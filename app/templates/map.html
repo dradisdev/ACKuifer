@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ACKuifer — Map</title>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #1a1a1a; background: #f8f9fa;
+    }
+    /* Top bar */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.6rem 1rem; background: #1a3a5c; color: #fff;
+      flex-wrap: wrap; gap: 0.5rem;
+    }
+    .topbar h1 { font-size: 1.1rem; font-weight: 700; }
+    .topbar h1 a { color: #fff; text-decoration: none; }
+    .topbar-actions { display: flex; gap: 0.5rem; align-items: center; }
+    .topbar-actions a {
+      color: #fff; text-decoration: none; font-size: 0.85rem;
+      padding: 0.35rem 0.7rem; border: 1px solid rgba(255,255,255,0.4);
+      border-radius: 4px;
+    }
+    .topbar-actions a:hover { background: rgba(255,255,255,0.15); }
+    /* Controls panel */
+    .controls {
+      display: flex; flex-wrap: wrap; gap: 0.8rem; align-items: center;
+      padding: 0.6rem 1rem; background: #fff; border-bottom: 1px solid #e2e8f0;
+      font-size: 0.85rem;
+    }
+    .control-group { display: flex; align-items: center; gap: 0.4rem; }
+    .control-group label { font-weight: 600; color: #4a5568; white-space: nowrap; }
+    .control-group select {
+      padding: 0.3rem 0.5rem; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 0.85rem;
+    }
+    .cb-group { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+    .cb-group label { display: flex; align-items: center; gap: 0.2rem; cursor: pointer; font-weight: 400; color: #1a1a1a; }
+    .cb-group input { accent-color: #2b6cb0; }
+    .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+    .dot-nd { background: #38a169; }
+    .dot-d { background: #d69e2e; }
+    .dot-hd { background: #dd6b20; }
+    .dot-hz { background: #e53e3e; }
+    /* Map container */
+    #map { width: 100%; height: calc(100vh - 220px); min-height: 400px; }
+    /* Disclaimer */
+    .disclaimer {
+      padding: 0.6rem 1rem; background: #fffbeb; border-bottom: 1px solid #f6e05e;
+      font-size: 0.78rem; color: #744210; line-height: 1.4;
+    }
+    /* Table */
+    .table-section { padding: 0.8rem 1rem; }
+    .table-section h2 { font-size: 1rem; margin-bottom: 0.5rem; color: #1a3a5c; }
+    #results-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    #results-table th {
+      text-align: left; padding: 0.5rem; border-bottom: 2px solid #e2e8f0;
+      color: #4a5568; font-weight: 600;
+    }
+    #results-table td { padding: 0.5rem; border-bottom: 1px solid #f0f0f0; }
+    .status-badge {
+      display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px;
+      font-size: 0.75rem; font-weight: 600; color: #fff;
+    }
+    .status-NON-DETECT { background: #38a169; }
+    .status-DETECT { background: #d69e2e; }
+    .status-HIGH-DETECT { background: #dd6b20; }
+    .status-HAZARD { background: #e53e3e; }
+    .above-mcl { font-weight: 700; color: #e53e3e; }
+    /* Popup */
+    .mapboxgl-popup-content { padding: 12px 16px; font-size: 0.85rem; line-height: 1.5; }
+    .popup-source { font-size: 0.75rem; color: #718096; }
+    .popup-value { font-weight: 700; }
+    @media (max-width: 600px) {
+      .controls { font-size: 0.8rem; gap: 0.5rem; }
+      #map { height: calc(100vh - 260px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1><a href="/">ACKuifer</a></h1>
+    <div class="topbar-actions">
+      <a href="/signup">Get alerts</a>
+      <a href="/">Home</a>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    MassDEP Source Discovery results reflect a targeted contamination investigation
+    and are not representative of typical residential well conditions.
+    Board of Health results reflect voluntary and pre-sale residential well tests.
+  </div>
+
+  <div class="controls">
+    <div class="control-group">
+      <label>Source:</label>
+      <div class="cb-group">
+        <label><input type="checkbox" id="toggle-lf" checked> Board of Health</label>
+        <label><input type="checkbox" id="toggle-sd" checked> Source Discovery</label>
+      </div>
+    </div>
+    <div class="control-group">
+      <label>Status:</label>
+      <div class="cb-group">
+        <label><input type="checkbox" class="status-cb" value="NON-DETECT" checked> <span class="dot dot-nd"></span> Non-detect</label>
+        <label><input type="checkbox" class="status-cb" value="DETECT" checked> <span class="dot dot-d"></span> Detect</label>
+        <label><input type="checkbox" class="status-cb" value="HIGH-DETECT" checked> <span class="dot dot-hd"></span> High</label>
+        <label><input type="checkbox" class="status-cb" value="HAZARD" checked> <span class="dot dot-hz"></span> Hazard</label>
+      </div>
+    </div>
+    <div class="control-group">
+      <label for="time-filter">Time:</label>
+      <select id="time-filter">
+        <option value="0">All time</option>
+        <option value="365">Last year</option>
+        <option value="60">Last 60 days</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <div class="table-section">
+    <h2>Results (<span id="result-count">0</span>)</h2>
+    <div style="overflow-x:auto;">
+      <table id="results-table">
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Neighborhood</th>
+            <th>Street</th>
+            <th>PFAS6 (ppt)</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Report</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+<script>
+mapboxgl.accessToken = '{{ mapbox_token }}';
+
+const STATUS_COLORS = {
+  'NON-DETECT': '#38a169',
+  'DETECT': '#d69e2e',
+  'HIGH-DETECT': '#dd6b20',
+  'HAZARD': '#e53e3e',
+};
+
+const SOURCE_LABELS = {
+  'laserfiche': 'Board of Health',
+  'massdep': 'MassDEP Source Discovery',
+};
+
+const MCL = 20.0;
+let allResults = [];
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/light-v11',
+  center: [-70.05, 41.28],
+  zoom: 12.2,
+});
+
+map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+// Create marker element
+function makeMarker(result) {
+  const el = document.createElement('div');
+  const size = 14;
+  const color = STATUS_COLORS[result.result_status] || '#999';
+  if (result.source === 'laserfiche') {
+    // Triangle
+    el.style.cssText = `width:0;height:0;border-left:${size/2}px solid transparent;border-right:${size/2}px solid transparent;border-bottom:${size}px solid ${color};cursor:pointer;`;
+  } else {
+    // Square
+    el.style.cssText = `width:${size}px;height:${size}px;background:${color};cursor:pointer;border-radius:2px;`;
+  }
+  return el;
+}
+
+let markers = [];
+
+function clearMarkers() {
+  markers.forEach(m => m.remove());
+  markers = [];
+}
+
+function getActiveStatuses() {
+  return Array.from(document.querySelectorAll('.status-cb:checked')).map(cb => cb.value);
+}
+
+function getTimeDays() {
+  return parseInt(document.getElementById('time-filter').value) || 0;
+}
+
+function filterResults() {
+  const showLF = document.getElementById('toggle-lf').checked;
+  const showSD = document.getElementById('toggle-sd').checked;
+  const statuses = getActiveStatuses();
+  const days = getTimeDays();
+  const cutoff = days > 0 ? new Date(Date.now() - days * 86400000) : null;
+
+  return allResults.filter(r => {
+    if (r.source === 'laserfiche' && !showLF) return false;
+    if (r.source === 'massdep' && !showSD) return false;
+    if (!statuses.includes(r.result_status)) return false;
+    if (cutoff && r.sample_date) {
+      if (new Date(r.sample_date) < cutoff) return false;
+    }
+    return true;
+  });
+}
+
+function formatValue(r) {
+  if (r.pfas6_sum === null || r.pfas6_sum === 0) return 'Non-detect';
+  return r.pfas6_sum.toFixed(1) + ' ppt';
+}
+
+function formatDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function renderMarkers() {
+  clearMarkers();
+  const filtered = filterResults();
+
+  filtered.forEach(r => {
+    const el = makeMarker(r);
+    const valueStr = formatValue(r);
+    const aboveMCL = r.pfas6_sum !== null && r.pfas6_sum > MCL;
+    const popup = new mapboxgl.Popup({ offset: 10, maxWidth: '280px' }).setHTML(`
+      <div>
+        <strong>${r.street_name || 'Unknown location'}</strong><br>
+        <span class="popup-value">${valueStr}</span>
+        ${aboveMCL ? ' <span style="color:#e53e3e;font-weight:700;">Above MCL</span>' : ''}<br>
+        ${formatDate(r.sample_date)}<br>
+        <span class="popup-source">${SOURCE_LABELS[r.source] || r.source}</span><br>
+        ${r.source_doc_url ? `<a href="${r.source_doc_url}" target="_blank" rel="noopener">View report</a>` : ''}
+      </div>
+    `);
+    const marker = new mapboxgl.Marker({ element: el })
+      .setLngLat([r.lng, r.lat])
+      .setPopup(popup)
+      .addTo(map);
+    markers.push(marker);
+  });
+
+  // Update table
+  const tbody = document.querySelector('#results-table tbody');
+  tbody.innerHTML = '';
+  // Sort by date descending
+  const sorted = [...filtered].sort((a, b) => {
+    if (!a.sample_date) return 1;
+    if (!b.sample_date) return -1;
+    return b.sample_date.localeCompare(a.sample_date);
+  });
+  sorted.forEach(r => {
+    const aboveMCL = r.pfas6_sum !== null && r.pfas6_sum > MCL;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${SOURCE_LABELS[r.source] || r.source}</td>
+      <td>${r.neighborhood || '—'}</td>
+      <td>${r.street_name || '—'}</td>
+      <td class="${aboveMCL ? 'above-mcl' : ''}">${formatValue(r)}${aboveMCL ? ' Above MCL' : ''}</td>
+      <td><span class="status-badge status-${r.result_status}">${r.result_status}</span></td>
+      <td>${formatDate(r.sample_date)}</td>
+      <td>${r.source_doc_url ? `<a href="${r.source_doc_url}" target="_blank">Report</a>` : '—'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('result-count').textContent = filtered.length;
+}
+
+// Fetch data and render
+async function loadData() {
+  try {
+    const resp = await fetch('/api/results');
+    allResults = await resp.json();
+    renderMarkers();
+  } catch (e) {
+    console.error('Failed to load results:', e);
+  }
+}
+
+// Event listeners for controls
+document.getElementById('toggle-lf').addEventListener('change', renderMarkers);
+document.getElementById('toggle-sd').addEventListener('change', renderMarkers);
+document.querySelectorAll('.status-cb').forEach(cb => cb.addEventListener('change', renderMarkers));
+document.getElementById('time-filter').addEventListener('change', renderMarkers);
+
+map.on('load', loadData);
+</script>
+</body>
+</html>
