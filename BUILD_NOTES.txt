@@ -1,0 +1,87 @@
+# ACKuifer Build Notes & Open Items
+# Updated: Session 4 (Laserfiche scraper integration)
+# Keep this file in your project root and update as you go.
+
+## KNOWN DATA ISSUES
+- Docs 260081 and 303051 had street_name=None due to Laserfiche viewer UI chrome 
+  contaminating the address field. Parser fix applied in Step 4. Street names 
+  manually corrected to "Beacon Lane" and "Quidnet Road" respectively.
+- 171 Source Discovery records have geocode_review_needed=True and no lat/lng. 
+  All excluded from map display until geocoded. Addressed in Step 5.
+
+## SCHEMA / DATABASE NOTES
+- Error queue is implemented as seen_documents.parse_status='error' (not a 
+  separate error_queue table). Admin interface (Step 8) must query 
+  seen_documents WHERE parse_status='error' for the parse error queue display.
+- seen_documents uses doc_key + source columns to handle both Laserfiche doc IDs 
+  and EEA PDF URLs in one table.
+
+## PARSER NOTES
+- Boundary bug in prototype: test_report_parser.py and pace_lab_parser.py both 
+  use <= 89.9 instead of < 90.0 for HIGH-DETECT. Fixed in production via 
+  classify_result_status() in config.py. Do not reuse prototype status logic.
+- pace_lab_parser.py has PFHpS instead of PFHpA in REGULATED_ABBREVS — may need 
+  mapping when integrating in Step 5. Verify against actual Source Discovery 
+  report field names before building massdep.py.
+- pace_lab_parser.py STREET_EXPANSIONS table is valuable — preserve it during 
+  Step 5 integration.
+- address_lookup.py is NOT needed for scraper integration — map/parcel comes 
+  from folder path. Operator utility only.
+
+## WATER SERVICE AREA (DEFERRED)
+- MassGIS pwsdep_pt/ layer contains well source point locations, NOT service 
+  area polygons. Not suitable for municipal water soft warning feature.
+- check_municipal_water() is stubbed in config.py — assumes no address is on 
+  municipal water.
+- To implement properly: need service area boundary polygon from Wannacomet 
+  Water Company (operating name for Nantucket Water Works). 
+  Recommended: email Wannacomet directly requesting a service area shapefile.
+- Feature should remain stubbed until proper polygon is obtained.
+
+## NEIGHBORHOOD DATA NOTES
+- Final neighborhood list has 23 neighborhoods (Sconset merged into Siasconset).
+- 14 features are OSM polygons; 10 were added manually as Points with 
+  approximate coordinates: Brant Point, Dionis, Madequecham, Miacomet, 
+  Mid-Island, Nobadeer, Sconset(removed), The Cliff, Tom Nevers, Town.
+- Point-based neighborhoods use nearest-point assignment rather than 
+  polygon containment — less precise. Consider obtaining proper polygon 
+  boundaries from Town GIS for a future update.
+- Tom Nevers coverage was ambiguous in original OSM export — verify assignments 
+  look correct once Source Discovery records are geocoded.
+
+## SCRAPER NOTES
+- Full-island Laserfiche traversal not yet run end-to-end. Only Map 21 tested 
+  in prototype and Task 4 validation. First full run will be a significant 
+  operation — monitor closely.
+- Laserfiche scraper uses map_filter parameter for targeted testing 
+  (e.g. map_filter="21"). Useful for debugging specific maps.
+- Railway cron entry point: python3 -m app.scrapers.run_laserfiche
+
+## STEP 5 REMINDERS (MassDEP / Source Discovery)
+- pace_lab_parser.py: check PFHpS vs PFHpA mapping before integrating
+- pace_lab_parser.py: preserve STREET_EXPANSIONS table
+- All 171 Source Discovery records need geocoding — substantial task
+- Geocode review queue needed in admin interface for records where 
+  geocode_review_needed=True
+- EEA portal dedup key format: confirm URL-based vs document identifier 
+  before building seen_documents check
+
+## FUTURE / V2 REMINDERS
+- Paid tier: users.tier field defaults to 'free' — add 'paid' check before 
+  gating any features in v2
+- Island-wide consolidated digest planned for v2 (currently one email per 
+  neighborhood)
+- Multiple recipients per subscription planned for v2
+- SMS for all detections (not just near-MCL) planned for v2
+- Stripe integration planned for v2
+
+## ADMIN INTERFACE REMINDERS (Step 8)
+- Parse error queue: query seen_documents WHERE parse_status='error'
+- Geocode review queue: query source_discovery_results WHERE 
+  geocode_review_needed=True — operator needs to enter corrected lat/lng 
+  and mark as resolved
+- Editable content panel needed for: municipal water warning text, PFAS info 
+  page links (section headings, labels, URLs) — must be editable without 
+  code deploy
+- Dead man's switch: separate status indicators for each scraper independently
+- Manual trigger buttons for each scraper independently
