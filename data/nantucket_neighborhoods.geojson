@@ -1,0 +1,537 @@
+{
+  "type": "FeatureCollection",
+  "generator": "overpass-turbo",
+  "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL.",
+  "timestamp": "2026-03-15T18:19:30Z",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/60637319",
+        "created_by": "Potlatch alpha",
+        "is_in": "Nantucket",
+        "name": "Ram Pasture",
+        "place": "hamlet"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.1402299,
+          41.2752521
+        ]
+      },
+      "id": "node/60637319"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/60637626",
+        "created_by": "Potlatch alpha",
+        "is_in": "Nantucket",
+        "name": "Wannacomet",
+        "place": "hamlet"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.1251666,
+          41.283231
+        ]
+      },
+      "id": "node/60637626"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/60673224",
+        "created_by": "Potlatch alpha",
+        "is_in": "Nantucket County",
+        "name": "Madaket",
+        "place": "village",
+        "wikidata": "Q6726197"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.1954109,
+          41.2726754
+        ]
+      },
+      "id": "node/60673224"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/69087231",
+        "is_in": "Nantucket",
+        "name": "Quidnet",
+        "place": "village",
+        "wikidata": "Q110852960"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -69.9815742,
+          41.3049121
+        ]
+      },
+      "id": "node/69087231"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/69087555",
+        "is_in": "Nantucket",
+        "name": "Squam",
+        "place": "village",
+        "wikidata": "Q110852935"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -69.9884506,
+          41.3140167
+        ]
+      },
+      "id": "node/69087555"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158806425",
+        "ele": "1",
+        "gnis:feature_id": "616971",
+        "name": "Wauwinet",
+        "place": "hamlet",
+        "wikidata": "Q7975242"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -69.9961254,
+          41.3292877
+        ]
+      },
+      "id": "node/158806425"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158811454",
+        "ele": "2",
+        "gnis:feature_id": "616949",
+        "name": "Polpis",
+        "place": "hamlet",
+        "wikidata": "Q7225976"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.0127923,
+          41.2984552
+        ]
+      },
+      "id": "node/158811454"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158811878",
+        "ele": "16",
+        "gnis:feature_id": "616962",
+        "name": "Siasconset",
+        "place": "village",
+        "wikidata": "Q7506866",
+        "wikipedia": "en:Siasconset, Massachusetts"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -69.9661245,
+          41.2626228
+        ]
+      },
+      "id": "node/158811878"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158812720",
+        "ele": "8",
+        "gnis:feature_id": "616946",
+        "name": "Pocomo",
+        "place": "hamlet"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.0202924,
+          41.3140104
+        ]
+      },
+      "id": "node/158812720"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158813501",
+        "ele": "6",
+        "gnis:feature_id": "617257",
+        "name": "Town Pasture",
+        "place": "hamlet"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.1161275,
+          41.2834564
+        ]
+      },
+      "id": "node/158813501"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158813846",
+        "ele": "1",
+        "gnis:feature_id": "616850",
+        "name": "Coskata",
+        "place": "hamlet",
+        "wikidata": "Q5173957"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.0202925,
+          41.3542871
+        ]
+      },
+      "id": "node/158813846"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158813869",
+        "ele": "7",
+        "gnis:feature_id": "617224",
+        "name": "Shallow Pond",
+        "place": "hamlet"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.1311278,
+          41.2934562
+        ]
+      },
+      "id": "node/158813869"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158818535",
+        "ele": "1",
+        "gnis:feature_id": "619351",
+        "name": "Smooth Hummocks",
+        "place": "hamlet"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.1411279,
+          41.2498467
+        ]
+      },
+      "id": "node/158818535"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158819503",
+        "ele": "5",
+        "gnis:feature_id": "616958",
+        "name": "Shawkemo",
+        "place": "hamlet",
+        "wikidata": "Q7491263"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.0577931,
+          41.2945667
+        ]
+      },
+      "id": "node/158819503"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158843344",
+        "ele": "0",
+        "gnis:feature_id": "616737",
+        "name": "Warren Landing",
+        "place": "hamlet"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.1919622,
+          41.2862347
+        ]
+      },
+      "id": "node/158843344"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158844316",
+        "ele": "4",
+        "gnis:feature_id": "616968",
+        "name": "Surfside",
+        "place": "hamlet"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.0877935,
+          41.2445685
+        ]
+      },
+      "id": "node/158844316"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158845487",
+        "ele": "6",
+        "gnis:feature_id": "616960",
+        "name": "Shimmo",
+        "place": "hamlet"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.0744601,
+          41.2862338
+        ]
+      },
+      "id": "node/158845487"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158846905",
+        "ele": "12",
+        "gnis:feature_id": "616952",
+        "name": "Quaise",
+        "place": "hamlet"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.0355705,
+          41.2940111
+        ]
+      },
+      "id": "node/158846905"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158853559",
+        "ele": "6",
+        "gnis:feature_id": "616676",
+        "name": "Cisco",
+        "place": "hamlet"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.1536282,
+          41.2542911
+        ]
+      },
+      "id": "node/158853559"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158854652",
+        "ele": "9",
+        "gnis:feature_id": "616930",
+        "name": "Chadwicks Folly",
+        "place": "hamlet"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -69.9897363,
+          41.3198434
+        ]
+      },
+      "id": "node/158854652"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158855369",
+        "ele": "1",
+        "gnis:feature_id": "616687",
+        "name": "Fishers Landing",
+        "place": "hamlet"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.1791842,
+          41.2937343
+        ]
+      },
+      "id": "node/158855369"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158859045",
+        "ele": "3",
+        "gnis:feature_id": "616939",
+        "name": "Hoicks Hollow",
+        "place": "hamlet"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -69.96729,
+          41.2904501
+        ]
+      },
+      "id": "node/158859045"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158860128",
+        "ele": "5",
+        "gnis:feature_id": "616931",
+        "name": "Codfish Park",
+        "place": "hamlet"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -69.9607647,
+          41.2660688
+        ]
+      },
+      "id": "node/158860128"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158860784",
+        "ele": "11",
+        "gnis:feature_id": "617169",
+        "name": "Mikas Pond",
+        "place": "hamlet"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.1030717,
+          41.2834563
+        ]
+      },
+      "id": "node/158860784"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158861165",
+        "ele": "9",
+        "gnis:feature_id": "616942",
+        "name": "Monomoy",
+        "place": "hamlet"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.0811269,
+          41.2779008
+        ]
+      },
+      "id": "node/158861165"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158874056",
+        "ele": "7",
+        "gnis:feature_id": "617154",
+        "name": "Long Josephs Point",
+        "place": "hamlet"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.0994604,
+          41.2459574
+        ]
+      },
+      "id": "node/158874056"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158895305",
+        "ele": "9",
+        "gnis:feature_id": "617196",
+        "name": "Plainfield",
+        "place": "hamlet"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -69.9827916,
+          41.2751224
+        ]
+      },
+      "id": "node/158895305"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158902204",
+        "ele": "14",
+        "gnis:feature_id": "617221",
+        "name": "Sesachacha",
+        "place": "hamlet"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -69.9828173,
+          41.2882798
+        ]
+      },
+      "id": "node/158902204"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "@id": "node/158915824",
+        "ele": "7",
+        "gnis:feature_id": "619354",
+        "name": "Trots Hills",
+        "place": "hamlet"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.1577949,
+          41.2876233
+        ]
+      },
+      "id": "node/158915824"
+    }
+  ]
+}

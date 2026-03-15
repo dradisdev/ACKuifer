@@ -98,9 +98,9 @@ J-qualified values included in PFAS6 sum as reported.
 ---
 
 ## Reference Data Files (static, in `/data`)
-- `nantucket_parcels.geojson` — MassGIS statewide parcel layer, Nantucket slice. Parcel lookup key: map_number + parcel_number (e.g. "21-80"). Used for Laserfiche centroid lookup.
-- `nantucket_neighborhoods.geojson` — OSM village/hamlet polygon boundaries. Used for point-in-polygon neighborhood assignment (Shapely).
-- `nantucket_water_service.geojson` — Nantucket Water Works municipal service area. Used at signup to show soft municipal water warning.
+- `L3_SHP_M197_Nantucket/` — MassGIS Level 3 Parcels, Nantucket municipality (Shapefile). Must be converted to GeoJSON in Step 1 of build using geopandas. Parcel lookup key: map_number + parcel_number (e.g. "21-80"). Used for Laserfiche centroid lookup. Output file after conversion: `nantucket_parcels.geojson`.
+- `nantucket_neighborhoods.geojson` — OSM village/hamlet polygon boundaries exported from Overpass Turbo. Used for point-in-polygon neighborhood assignment (Shapely).
+- `pwsdep_pt/` — MassGIS Public Water Supplies (Shapefile, statewide, data as of 09/03/2025). Must be filtered to Nantucket and processed in Step 1 to produce `nantucket_water_service.geojson` for the municipal water soft warning at signup. Source: https://www.mass.gov/info-details/massgis-data-public-water-supplies. Note: this layer covers public water supply source locations — confirm it is suitable for service area detection before building the signup check; if not, the water warning feature should be stubbed pending a better polygon source.
 
 Fallback neighborhood for unresolved parcels or out-of-polygon centroids: `Nantucket (Island-wide)`.
 
