@@ -1,0 +1,49 @@
+# ACKuifer Python Dependencies
+# Claude Code will add to this as the build progresses.
+# Install with: pip install -r requirements.txt
+
+# ============================================================
+# WEB FRAMEWORK
+# ============================================================
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+jinja2>=3.1.0
+python-multipart>=0.0.9       # Form handling in FastAPI
+
+# ============================================================
+# DATABASE
+# ============================================================
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.9        # PostgreSQL adapter
+alembic>=1.13.0               # Database migrations
+
+# ============================================================
+# SCRAPING
+# ============================================================
+playwright>=1.42.0             # Laserfiche + MapGeo scraping
+pdfplumber>=0.10.0             # MassDEP Source Discovery PDF parsing
+
+# ============================================================
+# GEO
+# ============================================================
+shapely>=2.0.0                 # Point-in-polygon neighborhood lookup
+
+# ============================================================
+# NOTIFICATIONS
+# ============================================================
+resend>=0.8.0                  # Transactional email
+twilio>=8.0.0                  # SMS alerts
+
+# ============================================================
+# UTILITIES
+# ============================================================
+python-dotenv>=1.0.0           # Load .env in local development
+httpx>=0.27.0                  # Async HTTP client
+pydantic>=2.0.0                # Data validation (FastAPI uses this)
+pydantic-settings>=2.0.0       # Settings management from env vars
+
+# ============================================================
+# DEV / TESTING (not needed in production)
+# ============================================================
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
