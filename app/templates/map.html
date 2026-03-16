@@ -299,7 +299,15 @@ document.getElementById('toggle-sd').addEventListener('change', renderMarkers);
 document.querySelectorAll('.status-cb').forEach(cb => cb.addEventListener('change', renderMarkers));
 document.getElementById('time-filter').addEventListener('change', renderMarkers);
 
-map.on('load', loadData);
+map.on('load', () => {
+  // Privacy: hide building footprints so individual parcels aren't identifiable
+  map.getStyle().layers.forEach(layer => {
+    if (layer.id.includes('building')) {
+      map.setLayoutProperty(layer.id, 'visibility', 'none');
+    }
+  });
+  loadData();
+});
 </script>
 </body>
 </html>
