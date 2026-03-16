@@ -99,3 +99,32 @@
   code deploy
 - Dead man's switch: separate status indicators for each scraper independently
 - Manual trigger buttons for each scraper independently
+
+## DEPLOYMENT STATUS (as of March 16, 2026)
+- Live at: https://www.ackuifer.org
+- Railway project: ACKuifer (hearty-solace)
+- Three Railway services running:
+  * Web service — FastAPI app, continuous
+  * laserfiche-cron — runs daily at 8 AM UTC (python -m app.scrapers.run_laserfiche)
+  * massdep-cron — runs daily at 9 AM UTC (python -m app.scrapers.run_massdep)
+- Domain: www.ackuifer.org (CNAME to Railway)
+- Root domain ackuifer.org forwards to www.ackuifer.org via Squarespace
+- SSL: Auto-provisioned by Railway via Let's Encrypt
+- Database: Railway managed PostgreSQL (internal URL in all three services)
+- Building footprint privacy fix applied (Mapbox style changed to light-v11)
+- DMARC record still needs to be added to Squarespace DNS (see EMAIL DELIVERABILITY section)
+
+## NEXT SESSION PRIORITIES
+1. Geocode review queue — work through 68 flagged Source Discovery records
+   in the admin panel at https://www.ackuifer.org/admin. Each record needs
+   manual lat/lng entry to appear on the map.
+2. First full Laserfiche scrape — trigger from admin panel, monitor closely,
+   expect 30-60 min runtime. Do one map group at a time initially.
+3. Operator handbook — document how to monitor, run scrapers, handle errors
+4. Post-launch polish (see EMAIL DELIVERABILITY section)
+5. Twilio/SMS setup — needs org account or volunteer, then activate sms.py
+
+## HOW TO START NEXT SESSION
+Upload CLAUDE.md and BUILD_NOTES.txt to a new chat with Claude.
+Open with: "ACKuifer is live. Here are my project files for context.
+I want to work on [specific item from NEXT SESSION PRIORITIES]."
