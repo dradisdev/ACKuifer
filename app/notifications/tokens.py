@@ -1,7 +1,8 @@
-"""Signed, time-limited tokens for unsubscribe and manage links.
+"""Signed, time-limited tokens for unsubscribe, manage, and confirm links.
 
 Uses itsdangerous with SECRET_KEY from config.py.
 - Unsubscribe tokens: never expire (one-click unsubscribe must always work)
+- Confirm tokens: never expire (confirmation links must always work)
 - Manage tokens: expire after 7 days per PRD Section 7.4
 """
 
@@ -20,6 +21,12 @@ _serializer = URLSafeTimedSerializer(settings.secret_key)
 # Salt values prevent token reuse across different purposes
 _UNSUBSCRIBE_SALT = "unsubscribe"
 _MANAGE_SALT = "manage"
+_CONFIRM_SALT = "confirm"
+
+
+def generate_confirm_token(user_id: str) -> str:
+    """Generate a signed confirmation token that never expires."""
+    return _serializer.dumps(user_id, salt=_CONFIRM_SALT)
 
 
 def generate_unsubscribe_token(user_id: str) -> str:
@@ -30,6 +37,18 @@ def generate_unsubscribe_token(user_id: str) -> str:
 def generate_manage_token(user_id: str) -> str:
     """Generate a signed manage-subscriptions token (expires in 7 days)."""
     return _serializer.dumps(user_id, salt=_MANAGE_SALT)
+
+
+def verify_confirm_token(token: str):
+    """Verify a confirmation token. Returns user_id or None.
+
+    Confirmation tokens never expire.
+    """
+    try:
+        return _serializer.loads(token, salt=_CONFIRM_SALT)
+    except BadSignature:
+        logger.warning("Invalid confirm token")
+        return None
 
 
 def verify_unsubscribe_token(token: str):

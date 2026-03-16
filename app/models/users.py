@@ -16,6 +16,7 @@ class User(Base):
     email = Column(String, unique=True, nullable=False)
     mobile = Column(String, nullable=True)  # E.164 format
     tier = Column(String, default="free")  # 'free' | 'paid'
+    confirmed_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_active_at = Column(DateTime(timezone=True), server_default=func.now())
     reconfirm_sent_at = Column(DateTime(timezone=True), nullable=True)

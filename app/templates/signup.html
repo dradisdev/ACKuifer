@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ACKuifer — Sign Up for Alerts</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #1a1a1a; background: #f8f9fa; line-height: 1.6;
+    }
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.6rem 1rem; background: #1a3a5c; color: #fff;
+    }
+    .topbar h1 { font-size: 1.1rem; font-weight: 700; }
+    .topbar h1 a { color: #fff; text-decoration: none; }
+    .topbar-actions a {
+      color: #fff; text-decoration: none; font-size: 0.85rem;
+      padding: 0.35rem 0.7rem; border: 1px solid rgba(255,255,255,0.4); border-radius: 4px;
+    }
+    .container { max-width: 520px; margin: 0 auto; padding: 2rem 1.5rem; }
+    h2 { font-size: 1.4rem; color: #1a3a5c; margin-bottom: 0.5rem; }
+    .subtitle { color: #4a5568; font-size: 0.95rem; margin-bottom: 1.5rem; }
+    .form-group { margin-bottom: 1.2rem; }
+    .form-group label {
+      display: block; font-weight: 600; color: #4a5568; font-size: 0.9rem; margin-bottom: 0.3rem;
+    }
+    .form-group input, .form-group select {
+      width: 100%; padding: 0.65rem 0.8rem; border: 1px solid #cbd5e0;
+      border-radius: 6px; font-size: 1rem; outline: none;
+    }
+    .form-group input:focus, .form-group select:focus {
+      border-color: #3182ce; box-shadow: 0 0 0 2px rgba(49,130,206,0.2);
+    }
+    .form-group select[multiple] { height: auto; min-height: 160px; }
+    .form-group .help { font-size: 0.8rem; color: #718096; margin-top: 0.3rem; }
+    .error-msg {
+      background: #FFF5F5; border: 1px solid #FED7D7; color: #C53030;
+      padding: 0.7rem 1rem; border-radius: 6px; font-size: 0.9rem; margin-bottom: 1.2rem;
+    }
+    .water-warning {
+      background: #FFFBEB; border: 1px solid #F6E05E; color: #744210;
+      padding: 0.7rem 1rem; border-radius: 6px; font-size: 0.85rem; margin-bottom: 1.2rem;
+      line-height: 1.5;
+    }
+    .btn-primary {
+      display: inline-block; width: 100%; padding: 0.75rem; background: #2b6cb0; color: #fff;
+      border: none; border-radius: 6px; font-size: 1rem; font-weight: 600;
+      cursor: pointer; text-align: center;
+    }
+    .btn-primary:hover { background: #2c5282; }
+    footer {
+      text-align: center; margin-top: 2rem; padding-top: 1rem;
+      border-top: 1px solid #e2e8f0; color: #718096; font-size: 0.8rem;
+    }
+    @media (max-width: 480px) {
+      .container { padding: 1.5rem 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1><a href="/">ACKuifer</a></h1>
+    <div class="topbar-actions">
+      <a href="/map">Map</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <h2>Sign up for PFAS alerts</h2>
+    <p class="subtitle">
+      Get notified by email when new well test results are posted in your neighborhood.
+    </p>
+
+    {% if error %}
+    <div class="error-msg">{{ error }}</div>
+    {% endif %}
+
+    <div class="water-warning">
+      <strong>Private well owners:</strong> ACKuifer monitors the Town of Nantucket Well Testing
+      Program and the MassDEP Source Discovery Program. If you are on municipal water
+      (Wannacomet Water), these results may not apply to you. If you have a private well, continue below.
+    </div>
+
+    <form method="post" action="/signup">
+      <div class="form-group">
+        <label for="email">Email address</label>
+        <input type="email" id="email" name="email" required placeholder="you@example.com">
+      </div>
+
+      <div class="form-group">
+        <label for="mobile">Mobile number <span style="font-weight:400;color:#718096;">(optional)</span></label>
+        <input type="tel" id="mobile" name="mobile" placeholder="+1 (508) 555-0100">
+        <p class="help">For SMS alerts when results exceed safety thresholds.</p>
+      </div>
+
+      <div class="form-group">
+        <label for="neighborhoods">Neighborhoods</label>
+        <select id="neighborhoods" name="neighborhoods" multiple required>
+          {% for hood in neighborhoods %}
+          <option value="{{ hood }}" {% if pre_neighborhood and hood == pre_neighborhood %}selected{% endif %}>{{ hood }}</option>
+          {% endfor %}
+        </select>
+        <p class="help">Hold Ctrl/Cmd to select multiple neighborhoods.</p>
+      </div>
+
+      <button type="submit" class="btn-primary">Sign up</button>
+    </form>
+
+    <footer>
+      Your email is never shared. <a href="/pfas-info" style="color:#4a5568;">Learn about PFAS</a>
+    </footer>
+  </div>
+</body>
+</html>

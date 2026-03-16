@@ -277,7 +277,7 @@ def _build_digest_html(neighborhood: str, rows: list, unsubscribe_url: str, mana
 
   <div style="background:#1A3A5C;padding:16px 20px;border-radius:8px 8px 0 0;">
     <h1 style="color:#FFFFFF;font-size:18px;margin:0;">
-      <a href="https://ackuifer.org" style="color:#FFFFFF;text-decoration:none;">ACKuifer</a>
+      <a href="{settings.base_url}" style="color:#FFFFFF;text-decoration:none;">ACKuifer</a>
     </h1>
   </div>
 
@@ -295,13 +295,13 @@ def _build_digest_html(neighborhood: str, rows: list, unsubscribe_url: str, mana
 
     <div style="margin-top:24px;padding-top:16px;border-top:1px solid #EDF2F7;">
       <p style="font-size:13px;color:#718096;margin:0;">
-        <a href="https://ackuifer.org/map" style="color:#2B6CB0;text-decoration:none;">View map</a> &middot;
+        <a href="{settings.base_url}/map" style="color:#2B6CB0;text-decoration:none;">View map</a> &middot;
         <a href="{manage_url}" style="color:#2B6CB0;text-decoration:none;">Manage subscriptions</a> &middot;
         <a href="{unsubscribe_url}" style="color:#2B6CB0;text-decoration:none;">Unsubscribe</a>
       </p>
       <p style="font-size:12px;color:#A0AEC0;margin:8px 0 0 0;">
         ACKuifer is an independent public-interest service. Your email is never shared.
-        <a href="https://ackuifer.org" style="color:#A0AEC0;">ackuifer.org</a>
+        <a href="{settings.base_url}" style="color:#A0AEC0;">ackuifer.org</a>
       </p>
     </div>
   </div>
@@ -321,7 +321,7 @@ def _build_reconfirmation_html(user_email: str, reconfirm_url: str, unsubscribe_
 
   <div style="background:#1A3A5C;padding:16px 20px;border-radius:8px 8px 0 0;">
     <h1 style="color:#FFFFFF;font-size:18px;margin:0;">
-      <a href="https://ackuifer.org" style="color:#FFFFFF;text-decoration:none;">ACKuifer</a>
+      <a href="{settings.base_url}" style="color:#FFFFFF;text-decoration:none;">ACKuifer</a>
     </h1>
   </div>
 
@@ -345,7 +345,7 @@ def _build_reconfirmation_html(user_email: str, reconfirm_url: str, unsubscribe_
       </p>
       <p style="font-size:12px;color:#A0AEC0;margin:8px 0 0 0;">
         ACKuifer is an independent public-interest service. Your email is never shared.
-        <a href="https://ackuifer.org" style="color:#A0AEC0;">ackuifer.org</a>
+        <a href="{settings.base_url}" style="color:#A0AEC0;">ackuifer.org</a>
       </p>
     </div>
   </div>
@@ -388,12 +388,13 @@ def send_neighborhood_digest(
     if not rows:
         return 0
 
-    # Query active subscribers for this neighborhood
+    # Query active, confirmed subscribers for this neighborhood
     subscribers = (
         db.query(User)
         .join(Subscription)
         .filter(
             Subscription.neighborhood == neighborhood,
+            User.confirmed_at.isnot(None),
             User.unsubscribed_at.is_(None),
         )
         .all()
@@ -413,8 +414,8 @@ def send_neighborhood_digest(
 
         unsub_token = generate_unsubscribe_token(str(user.id))
         manage_token = generate_manage_token(str(user.id))
-        unsubscribe_url = f"https://ackuifer.org/unsubscribe?token={unsub_token}"
-        manage_url = f"https://ackuifer.org/manage?token={manage_token}"
+        unsubscribe_url = f"{settings.base_url}/unsubscribe?token={unsub_token}"
+        manage_url = f"{settings.base_url}/manage?token={manage_token}"
 
         html = _build_digest_html(neighborhood, rows, unsubscribe_url, manage_url)
 
@@ -441,6 +442,84 @@ def send_neighborhood_digest(
     return sent
 
 
+def send_confirmation_email(user: User, db: Session) -> bool:
+    """Send a signup confirmation email.
+
+    Returns True if sent successfully.
+    """
+    if not settings.resend_api_key:
+        logger.warning("RESEND_API_KEY not configured — skipping confirmation email")
+        return False
+
+    resend.api_key = settings.resend_api_key
+
+    from app.notifications.tokens import generate_confirm_token, generate_unsubscribe_token
+
+    confirm_token = generate_confirm_token(str(user.id))
+    unsub_token = generate_unsubscribe_token(str(user.id))
+    confirm_url = f"{settings.base_url}/confirm/{confirm_token}"
+    unsubscribe_url = f"{settings.base_url}/unsubscribe/{unsub_token}"
+
+    hood_names = [s.neighborhood for s in user.subscriptions]
+    hood_list = ", ".join(hood_names) if hood_names else "your selected neighborhoods"
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#F7FAFC;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<div style="max-width:640px;margin:0 auto;padding:20px;">
+
+  <div style="background:#1A3A5C;padding:16px 20px;border-radius:8px 8px 0 0;">
+    <h1 style="color:#FFFFFF;font-size:18px;margin:0;">
+      <a href="{settings.base_url}" style="color:#FFFFFF;text-decoration:none;">ACKuifer</a>
+    </h1>
+  </div>
+
+  <div style="background:#FFFFFF;padding:20px 20px 24px 20px;border-radius:0 0 8px 8px;border:1px solid #E2E8F0;border-top:none;">
+    <h2 style="color:#1A3A5C;font-size:18px;margin:0 0 12px 0;">Confirm your subscription</h2>
+    <p style="color:#4A5568;font-size:14px;line-height:1.6;margin:0 0 8px 0;">
+      You signed up for PFAS well test alerts in <strong>{hood_list}</strong>.
+    </p>
+    <p style="color:#4A5568;font-size:14px;line-height:1.6;margin:0 0 16px 0;">
+      Click the button below to confirm your email and activate your alerts.
+      You'll receive a digest email whenever new results are posted in your neighborhood.
+    </p>
+
+    <div style="text-align:center;margin:24px 0;">
+      <a href="{confirm_url}" style="display:inline-block;background:#2B6CB0;color:#FFFFFF;padding:12px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;">
+        Confirm my subscription
+      </a>
+    </div>
+
+    <div style="margin-top:24px;padding-top:16px;border-top:1px solid #EDF2F7;">
+      <p style="font-size:13px;color:#718096;margin:0;">
+        Didn't sign up? <a href="{unsubscribe_url}" style="color:#2B6CB0;text-decoration:none;">Unsubscribe</a>
+      </p>
+      <p style="font-size:12px;color:#A0AEC0;margin:8px 0 0 0;">
+        ACKuifer is an independent public-interest service. Your email is never shared.
+        <a href="{settings.base_url}" style="color:#A0AEC0;">ackuifer.org</a>
+      </p>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>"""
+
+    try:
+        resend.Emails.send({
+            "from": settings.email_from,
+            "to": [user.email],
+            "subject": "Confirm your ACKuifer subscription",
+            "html": html,
+        })
+        logger.info("Confirmation email sent to %s", user.email)
+        return True
+    except Exception:
+        logger.exception("Failed to send confirmation to %s", user.email)
+        return False
+
+
 def send_reconfirmation_email(user: User, db: Session) -> bool:
     """Send an inactivity re-confirmation email.
 
@@ -456,8 +535,8 @@ def send_reconfirmation_email(user: User, db: Session) -> bool:
 
     unsub_token = generate_unsubscribe_token(str(user.id))
     manage_token = generate_manage_token(str(user.id))
-    unsubscribe_url = f"https://ackuifer.org/unsubscribe?token={unsub_token}"
-    reconfirm_url = f"https://ackuifer.org/reconfirm?token={manage_token}"
+    unsubscribe_url = f"{settings.base_url}/unsubscribe?token={unsub_token}"
+    reconfirm_url = f"{settings.base_url}/reconfirm?token={manage_token}"
 
     html = _build_reconfirmation_html(user.email, reconfirm_url, unsubscribe_url)
 

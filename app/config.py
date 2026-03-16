@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     twilio_auth_token: str = ""
     twilio_from_number: str = ""
 
+    # Base URL for links in emails (no trailing slash)
+    base_url: str = "http://localhost:8080"
+
     # Mapbox
     mapbox_public_token: str = ""
 

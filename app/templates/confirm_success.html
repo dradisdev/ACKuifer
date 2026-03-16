@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ACKuifer — {% if success %}Confirmed{% else %}Error{% endif %}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #1a1a1a; background: #f8f9fa; line-height: 1.6;
+    }
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.6rem 1rem; background: #1a3a5c; color: #fff;
+    }
+    .topbar h1 { font-size: 1.1rem; font-weight: 700; }
+    .topbar h1 a { color: #fff; text-decoration: none; }
+    .topbar-actions a {
+      color: #fff; text-decoration: none; font-size: 0.85rem;
+      padding: 0.35rem 0.7rem; border: 1px solid rgba(255,255,255,0.4); border-radius: 4px;
+    }
+    .container { max-width: 520px; margin: 0 auto; padding: 2rem 1.5rem; text-align: center; }
+    .icon { font-size: 3rem; margin-bottom: 1rem; }
+    h2 { font-size: 1.4rem; color: #1a3a5c; margin-bottom: 0.5rem; }
+    .message { color: #4a5568; font-size: 0.95rem; margin-bottom: 1rem; }
+    .hood-list {
+      list-style: none; padding: 0; margin: 1rem auto; max-width: 300px; text-align: left;
+    }
+    .hood-list li {
+      padding: 0.4rem 0.8rem; background: #ebf4ff; border-radius: 4px;
+      margin-bottom: 0.4rem; color: #2b6cb0; font-weight: 500; font-size: 0.9rem;
+    }
+    .error-msg {
+      background: #FFF5F5; border: 1px solid #FED7D7; color: #C53030;
+      padding: 0.7rem 1rem; border-radius: 6px; font-size: 0.9rem; margin-bottom: 1.2rem;
+    }
+    .btn-primary {
+      display: inline-block; padding: 0.65rem 1.4rem; background: #2b6cb0; color: #fff;
+      border: none; border-radius: 6px; font-size: 0.95rem; font-weight: 600;
+      text-decoration: none; margin-top: 1.5rem;
+    }
+    .btn-primary:hover { background: #2c5282; }
+    .btn-secondary {
+      display: inline-block; padding: 0.6rem 1.4rem; margin-top: 0.8rem;
+      border: 2px solid #2b6cb0; color: #2b6cb0; border-radius: 6px;
+      text-decoration: none; font-weight: 600; font-size: 0.95rem;
+    }
+    .btn-secondary:hover { background: #ebf4ff; }
+    footer {
+      text-align: center; margin-top: 2rem; padding-top: 1rem;
+      border-top: 1px solid #e2e8f0; color: #718096; font-size: 0.8rem;
+    }
+    @media (max-width: 480px) { .container { padding: 1.5rem 1rem; } }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1><a href="/">ACKuifer</a></h1>
+    <div class="topbar-actions">
+      <a href="/map">Map</a>
+    </div>
+  </div>
+
+  <div class="container">
+    {% if success %}
+    <div class="icon">&#10003;</div>
+    <h2>You're confirmed!</h2>
+    <p class="message">
+      Your PFAS alert subscription is now active. You'll receive email notifications
+      when new well test results are posted in:
+    </p>
+    <ul class="hood-list">
+      {% for hood in neighborhoods %}
+      <li>{{ hood }}</li>
+      {% endfor %}
+    </ul>
+    <a href="/map" class="btn-primary">View the map</a>
+    <br>
+    <a href="/pfas-info" class="btn-secondary">Learn about PFAS</a>
+    {% else %}
+    <div class="icon">&#9888;</div>
+    <h2>Confirmation failed</h2>
+    <div class="error-msg">{{ error }}</div>
+    <p class="message">
+      Try signing up again or contact us if the problem persists.
+    </p>
+    <a href="/signup" class="btn-primary">Sign up again</a>
+    {% endif %}
+
+    <footer>
+      <a href="/pfas-info" style="color:#4a5568;">Learn about PFAS</a>
+    </footer>
+  </div>
+</body>
+</html>

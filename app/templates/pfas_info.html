@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ACKuifer — PFAS Information</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #1a1a1a; background: #f8f9fa; line-height: 1.6;
+    }
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.6rem 1rem; background: #1a3a5c; color: #fff;
+    }
+    .topbar h1 { font-size: 1.1rem; font-weight: 700; }
+    .topbar h1 a { color: #fff; text-decoration: none; }
+    .topbar-actions a {
+      color: #fff; text-decoration: none; font-size: 0.85rem;
+      padding: 0.35rem 0.7rem; border: 1px solid rgba(255,255,255,0.4); border-radius: 4px;
+    }
+    .container { max-width: 640px; margin: 0 auto; padding: 2rem 1.5rem; }
+    h2 { font-size: 1.5rem; color: #1a3a5c; margin-bottom: 0.5rem; }
+    .intro { color: #4a5568; font-size: 0.95rem; margin-bottom: 2rem; }
+    .section { margin-bottom: 2rem; }
+    .section h3 {
+      font-size: 1.1rem; color: #1a3a5c; margin-bottom: 0.8rem;
+      padding-bottom: 0.4rem; border-bottom: 2px solid #e2e8f0;
+    }
+    .link-list { list-style: none; padding: 0; }
+    .link-list li {
+      margin-bottom: 0.6rem;
+    }
+    .link-list a {
+      display: block; padding: 0.7rem 1rem; background: #fff;
+      border: 1px solid #e2e8f0; border-radius: 6px;
+      color: #2b6cb0; text-decoration: none; font-weight: 500;
+      font-size: 0.95rem; transition: background 0.15s;
+    }
+    .link-list a:hover {
+      background: #ebf4ff; border-color: #bee3f8;
+    }
+    .link-list .source {
+      display: block; font-size: 0.8rem; color: #718096;
+      font-weight: 400; margin-top: 0.15rem;
+    }
+    .mcl-box {
+      background: #EDF2F7; border-radius: 6px; padding: 1rem 1.2rem;
+      margin-bottom: 2rem; font-size: 0.9rem; color: #4a5568;
+    }
+    .mcl-box strong { color: #1a3a5c; }
+    .actions { text-align: center; margin-top: 2rem; }
+    .btn-secondary {
+      display: inline-block; padding: 0.6rem 1.4rem;
+      border: 2px solid #2b6cb0; color: #2b6cb0; border-radius: 6px;
+      text-decoration: none; font-weight: 600; font-size: 0.95rem;
+    }
+    .btn-secondary:hover { background: #ebf4ff; }
+    footer {
+      text-align: center; margin-top: 2.5rem; padding-top: 1rem;
+      border-top: 1px solid #e2e8f0; color: #718096; font-size: 0.8rem;
+    }
+    @media (max-width: 480px) { .container { padding: 1.5rem 1rem; } }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1><a href="/">ACKuifer</a></h1>
+    <div class="topbar-actions">
+      <a href="/map">Map</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <h2>PFAS Information</h2>
+    <p class="intro">
+      Curated links to authoritative resources about PFAS testing, regulations,
+      and how to understand your well test results.
+    </p>
+
+    <div class="mcl-box">
+      <strong>Massachusetts PFAS6 Standard:</strong> The Massachusetts Maximum Contaminant Level (MCL)
+      for the sum of six PFAS compounds (PFAS6) in drinking water is 20 parts per trillion (ppt).
+      Results at or below 20 ppt meet the state standard. Results above 20 ppt exceed it.
+    </div>
+
+    <div class="section">
+      <h3>Get Tested &mdash; Nantucket</h3>
+      <ul class="link-list">
+        <li>
+          <a href="https://www.nantucket-ma.gov/1702/Well-Testing-Sampling" target="_blank" rel="noopener">
+            Well Testing &amp; Sampling
+            <span class="source">Town of Nantucket</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://www.nantucket-ma.gov/1700/PFAS-on-Nantucket" target="_blank" rel="noopener">
+            PFAS on Nantucket
+            <span class="source">Town of Nantucket</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://www.nantucket-ma.gov/1701/Private-Well-Regulations" target="_blank" rel="noopener">
+            Private Well Regulations
+            <span class="source">Town of Nantucket</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h3>Understand Your Results &mdash; MassDEP</h3>
+      <ul class="link-list">
+        <li>
+          <a href="https://www.mass.gov/info-details/per-and-polyfluoroalkyl-substances-pfas-in-private-wells" target="_blank" rel="noopener">
+            PFAS in Private Wells FAQ
+            <span class="source">Massachusetts DEP</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://www.mass.gov/guides/how-to-interpret-your-drinking-water-lab-report" target="_blank" rel="noopener">
+            How to Interpret Your Lab Report
+            <span class="source">Massachusetts DEP</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://www.mass.gov/info-details/point-of-use-treatment-system-study" target="_blank" rel="noopener">
+            Point-of-Use Treatment System Study
+            <span class="source">Massachusetts DEP</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="actions">
+      <a href="/signup" class="btn-secondary">Sign up for PFAS alerts</a>
+    </div>
+
+    <footer>
+      ACKuifer is independently operated and is not affiliated with the Town of Nantucket.
+    </footer>
+  </div>
+</body>
+</html>
