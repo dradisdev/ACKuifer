@@ -65,6 +65,23 @@ def _result_to_email_row(result, source: str) -> dict:
     }
 
 
+def _get_retest_window_days() -> int:
+    """Read retest_window_days from site_config, falling back to config.py default."""
+    try:
+        from app.database import SessionLocal
+        from app.models.site_config import SiteConfig
+        db = SessionLocal()
+        try:
+            row = db.query(SiteConfig).filter(SiteConfig.key == "retest_window_days").first()
+            if row and row.value:
+                return int(row.value)
+        finally:
+            db.close()
+    except Exception:
+        pass
+    return RETEST_WINDOW_DAYS
+
+
 def _annotate_retests(rows: list) -> None:
     """Mark rows that are retests of a previous result at the same street.
 
@@ -96,7 +113,7 @@ def _annotate_retests(rows: list) -> None:
                 continue
 
             days_apart = (curr["sample_date_raw"] - prev["sample_date_raw"]).days
-            if days_apart > RETEST_WINDOW_DAYS:
+            if days_apart > _get_retest_window_days():
                 continue
 
             # Determine if this is a meaningful retest
@@ -553,4 +570,60 @@ def send_reconfirmation_email(user: User, db: Session) -> bool:
         return True
     except Exception:
         logger.exception("Failed to send reconfirmation to %s", user.email)
+        return False
+
+
+def send_deadmans_alert(source: str, last_run_at) -> bool:
+    """Send a dead man's switch alert to the operator.
+
+    Called when a scraper hasn't run successfully within DEADMANS_WINDOW_DAYS.
+    """
+    if not settings.resend_api_key or not settings.operator_email:
+        logger.warning("Cannot send dead man's alert — missing RESEND_API_KEY or OPERATOR_EMAIL")
+        return False
+
+    resend.api_key = settings.resend_api_key
+
+    source_label = "Laserfiche" if source == "laserfiche" else "MassDEP Source Discovery"
+    if last_run_at:
+        last_run_str = last_run_at.strftime("%Y-%m-%d %H:%M UTC")
+    else:
+        last_run_str = "Never"
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F7FAFC;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<div style="max-width:640px;margin:0 auto;padding:20px;">
+  <div style="background:#C53030;padding:16px 20px;border-radius:8px 8px 0 0;">
+    <h1 style="color:#FFFFFF;font-size:18px;margin:0;">ACKuifer — Dead Man's Switch Alert</h1>
+  </div>
+  <div style="background:#FFFFFF;padding:20px;border-radius:0 0 8px 8px;border:1px solid #E2E8F0;border-top:none;">
+    <p style="color:#1A202C;font-size:14px;line-height:1.6;">
+      The <strong>{source_label}</strong> scraper has not completed a successful run
+      within the last <strong>{settings.deadmans_window_days} days</strong>.
+    </p>
+    <p style="color:#4A5568;font-size:14px;margin-top:12px;">
+      Last successful run: <strong>{last_run_str}</strong>
+    </p>
+    <p style="color:#4A5568;font-size:14px;margin-top:12px;">
+      Check the <a href="{settings.base_url}/admin" style="color:#2B6CB0;">admin dashboard</a>
+      for details and consider triggering a manual run.
+    </p>
+  </div>
+</div>
+</body>
+</html>"""
+
+    try:
+        resend.Emails.send({
+            "from": settings.email_from,
+            "to": [settings.operator_email],
+            "subject": f"ACKuifer ALERT: {source_label} scraper overdue",
+            "html": html,
+        })
+        logger.warning("Dead man's switch alert sent for %s to %s", source, settings.operator_email)
+        return True
+    except Exception:
+        logger.exception("Failed to send dead man's switch alert for %s", source)
         return False

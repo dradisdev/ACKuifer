@@ -37,8 +37,31 @@ def _validate_email(email: str) -> bool:
 
 # --- GET /pfas-info ---
 @router.get("/pfas-info", response_class=HTMLResponse)
-def pfas_info(request: Request):
-    return templates.TemplateResponse("pfas_info.html", {"request": request})
+def pfas_info(request: Request, db: Session = Depends(get_db)):
+    from app.models.site_config import SiteConfig
+    configs = db.query(SiteConfig).all()
+    config_map = {c.key: c.value for c in configs}
+
+    # Build link lists from site_config (fall back to empty if missing)
+    tested_links = []
+    for i in range(1, 4):
+        label = config_map.get(f"pfas_info_tested_label_{i}", "")
+        url = config_map.get(f"pfas_info_tested_url_{i}", "")
+        if label and url:
+            tested_links.append({"label": label, "url": url})
+
+    results_links = []
+    for i in range(1, 4):
+        label = config_map.get(f"pfas_info_results_label_{i}", "")
+        url = config_map.get(f"pfas_info_results_url_{i}", "")
+        if label and url:
+            results_links.append({"label": label, "url": url})
+
+    return templates.TemplateResponse("pfas_info.html", {
+        "request": request,
+        "tested_links": tested_links,
+        "results_links": results_links,
+    })
 
 
 # --- GET /signup ---

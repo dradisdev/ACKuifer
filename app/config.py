@@ -69,7 +69,7 @@ INACTIVITY_MONTHS: int = 12
 RETENTION_DAYS_AFTER_UNSUBSCRIBE: int = 30
 
 # Days within which same-street results are treated as retests in digest
-RETEST_WINDOW_DAYS: int = 45
+RETEST_WINDOW_DAYS: int = 60
 
 # Fallback neighborhood for unresolved parcels
 FALLBACK_NEIGHBORHOOD: str = "Nantucket (Island-wide)"

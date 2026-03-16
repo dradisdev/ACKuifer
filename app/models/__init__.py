@@ -3,3 +3,4 @@
 from app.models.users import User, Subscription  # noqa: F401
 from app.models.results import PfasResult, SourceDiscoveryResult  # noqa: F401
 from app.models.scraper import SeenDocument, ScrapeRun  # noqa: F401
+from app.models.site_config import SiteConfig  # noqa: F401

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ACKuifer Admin</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #1a1a1a; background: #f0f2f5; line-height: 1.5; font-size: 14px;
+    }
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.5rem 1rem; background: #1a3a5c; color: #fff;
+    }
+    .topbar h1 { font-size: 1rem; font-weight: 700; }
+    .topbar h1 a { color: #fff; text-decoration: none; }
+    .topbar-actions a {
+      color: #fff; text-decoration: none; font-size: 0.8rem;
+      padding: 0.3rem 0.6rem; border: 1px solid rgba(255,255,255,0.4); border-radius: 4px;
+      margin-left: 0.5rem;
+    }
+    .container { max-width: 1100px; margin: 0 auto; padding: 1rem; }
+    h2 { font-size: 1.15rem; color: #1a3a5c; margin-bottom: 0.8rem; padding-bottom: 0.3rem; border-bottom: 2px solid #e2e8f0; }
+    h3 { font-size: 0.95rem; color: #4a5568; margin-bottom: 0.5rem; }
+    .section { background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; margin-bottom: 1rem; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    /* Status indicators */
+    .status-green { color: #276749; background: #C6F6D5; padding: 2px 8px; border-radius: 3px; font-weight: 600; font-size: 0.8rem; }
+    .status-red { color: #9B2C2C; background: #FED7D7; padding: 2px 8px; border-radius: 3px; font-weight: 600; font-size: 0.8rem; }
+    .status-yellow { color: #744210; background: #FEFCBF; padding: 2px 8px; border-radius: 3px; font-weight: 600; font-size: 0.8rem; }
+    .status-gray { color: #4a5568; background: #EDF2F7; padding: 2px 8px; border-radius: 3px; font-weight: 600; font-size: 0.8rem; }
+
+    .stat-row { display: flex; justify-content: space-between; padding: 0.3rem 0; border-bottom: 1px solid #f7fafc; }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-label { color: #718096; }
+    .stat-value { font-weight: 600; }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th { text-align: left; padding: 0.5rem 0.6rem; background: #f7fafc; border-bottom: 2px solid #e2e8f0; color: #4a5568; font-weight: 600; }
+    td { padding: 0.4rem 0.6rem; border-bottom: 1px solid #edf2f7; }
+    tr:hover { background: #f7fafc; }
+
+    /* Buttons */
+    .btn { display: inline-block; padding: 0.45rem 1rem; border: none; border-radius: 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; text-decoration: none; }
+    .btn-primary { background: #2b6cb0; color: #fff; }
+    .btn-primary:hover { background: #2c5282; }
+    .btn-danger { background: #e53e3e; color: #fff; }
+    .btn-danger:hover { background: #c53030; }
+    .btn-sm { padding: 0.3rem 0.7rem; font-size: 0.8rem; }
+
+    /* Forms */
+    .form-row { margin-bottom: 0.8rem; }
+    .form-row label { display: block; font-weight: 600; font-size: 0.8rem; color: #4a5568; margin-bottom: 0.2rem; }
+    .form-row input, .form-row textarea {
+      width: 100%; padding: 0.4rem 0.6rem; border: 1px solid #cbd5e0;
+      border-radius: 4px; font-size: 0.85rem; outline: none;
+    }
+    .form-row input:focus, .form-row textarea:focus { border-color: #3182ce; }
+    .form-row textarea { min-height: 60px; resize: vertical; }
+    .form-inline { display: flex; gap: 0.5rem; align-items: end; }
+    .form-inline .form-row { margin-bottom: 0; flex: 1; }
+
+    .empty-state { color: #a0aec0; font-style: italic; padding: 1rem 0; text-align: center; }
+    a { color: #2b6cb0; }
+    .mono { font-family: monospace; font-size: 0.8rem; }
+    .truncate { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1><a href="/admin">ACKuifer Admin</a></h1>
+    <div class="topbar-actions">
+      <a href="/">Site</a>
+      <a href="/map">Map</a>
+      <a href="/admin/logout">Log out</a>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- ===== SCRAPER STATUS ===== -->
+    <h2>Scraper Status</h2>
+    <div class="grid-2">
+      <!-- Laserfiche -->
+      <div class="section">
+        <h3>Laserfiche (Board of Health)</h3>
+        {% if lf_status.healthy %}
+        <span class="status-green">Healthy</span>
+        {% else %}
+        <span class="status-red">Overdue ({{ deadmans_window }}d)</span>
+        {% endif %}
+        {% if lf_status.currently_running %}
+        <span class="status-yellow">Running</span>
+        {% endif %}
+        <div style="margin-top:0.6rem;">
+          {% if lf_status.last_success %}
+          <div class="stat-row"><span class="stat-label">Last success</span><span class="stat-value">{{ lf_status.last_success.completed_at.strftime('%Y-%m-%d %H:%M UTC') if lf_status.last_success.completed_at else 'N/A' }}</span></div>
+          <div class="stat-row"><span class="stat-label">Duration</span><span class="stat-value">{{ ((lf_status.last_success.completed_at - lf_status.last_success.started_at).total_seconds() | int) if lf_status.last_success.completed_at else 'N/A' }}s</span></div>
+          <div class="stat-row"><span class="stat-label">New docs</span><span class="stat-value">{{ lf_status.last_success.new_docs_found }}</span></div>
+          <div class="stat-row"><span class="stat-label">Parse errors</span><span class="stat-value">{{ lf_status.last_success.parse_errors }}</span></div>
+          {% else %}
+          <p class="empty-state">No successful runs yet</p>
+          {% endif %}
+          {% if lf_status.last_run and lf_status.last_run.status == 'error' %}
+          <div style="margin-top:0.5rem;background:#FFF5F5;padding:0.5rem;border-radius:4px;font-size:0.8rem;color:#C53030;">
+            Last run error: {{ lf_status.last_run.error_message or 'Unknown' }}
+          </div>
+          {% endif %}
+        </div>
+        <form method="post" action="/admin/run-laserfiche" style="margin-top:0.8rem;">
+          <button type="submit" class="btn btn-primary btn-sm" {% if lf_status.currently_running %}disabled{% endif %}>
+            {% if lf_status.currently_running %}Running...{% else %}Run Laserfiche Now{% endif %}
+          </button>
+        </form>
+      </div>
+
+      <!-- MassDEP -->
+      <div class="section">
+        <h3>MassDEP Source Discovery</h3>
+        {% if sd_status.healthy %}
+        <span class="status-green">Healthy</span>
+        {% else %}
+        <span class="status-red">Overdue ({{ deadmans_window }}d)</span>
+        {% endif %}
+        {% if sd_status.currently_running %}
+        <span class="status-yellow">Running</span>
+        {% endif %}
+        <div style="margin-top:0.6rem;">
+          {% if sd_status.last_success %}
+          <div class="stat-row"><span class="stat-label">Last success</span><span class="stat-value">{{ sd_status.last_success.completed_at.strftime('%Y-%m-%d %H:%M UTC') if sd_status.last_success.completed_at else 'N/A' }}</span></div>
+          <div class="stat-row"><span class="stat-label">Duration</span><span class="stat-value">{{ ((sd_status.last_success.completed_at - sd_status.last_success.started_at).total_seconds() | int) if sd_status.last_success.completed_at else 'N/A' }}s</span></div>
+          <div class="stat-row"><span class="stat-label">New docs</span><span class="stat-value">{{ sd_status.last_success.new_docs_found }}</span></div>
+          <div class="stat-row"><span class="stat-label">Parse errors</span><span class="stat-value">{{ sd_status.last_success.parse_errors }}</span></div>
+          {% else %}
+          <p class="empty-state">No successful runs yet</p>
+          {% endif %}
+          {% if sd_status.last_run and sd_status.last_run.status == 'error' %}
+          <div style="margin-top:0.5rem;background:#FFF5F5;padding:0.5rem;border-radius:4px;font-size:0.8rem;color:#C53030;">
+            Last run error: {{ sd_status.last_run.error_message or 'Unknown' }}
+          </div>
+          {% endif %}
+        </div>
+        <form method="post" action="/admin/run-massdep" style="margin-top:0.8rem;">
+          <button type="submit" class="btn btn-primary btn-sm" {% if sd_status.currently_running %}disabled{% endif %}>
+            {% if sd_status.currently_running %}Running...{% else %}Run MassDEP Now{% endif %}
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ===== PARSE ERROR QUEUE ===== -->
+    <h2>Parse Error Queue</h2>
+    <div class="grid-2">
+      <div class="section">
+        <h3>Laserfiche Errors ({{ lf_errors | length }})</h3>
+        {% if lf_errors %}
+        <table>
+          <thead><tr><th>Doc Key</th><th>Error</th><th>Discovered</th></tr></thead>
+          <tbody>
+          {% for doc in lf_errors %}
+          <tr>
+            <td><a href="https://portal.laserfiche.com/Portal/DocView.aspx?id={{ doc.doc_key }}&repo=r-ec7bdbfe" target="_blank" class="mono">{{ doc.doc_key }}</a></td>
+            <td class="truncate" title="{{ doc.error_message or '' }}">{{ doc.error_message or 'Unknown' }}</td>
+            <td>{{ doc.discovered_at.strftime('%Y-%m-%d') if doc.discovered_at else '' }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="empty-state">No parse errors</p>
+        {% endif %}
+      </div>
+      <div class="section">
+        <h3>MassDEP Errors ({{ sd_errors | length }})</h3>
+        {% if sd_errors %}
+        <table>
+          <thead><tr><th>Doc Key</th><th>Error</th><th>Discovered</th></tr></thead>
+          <tbody>
+          {% for doc in sd_errors %}
+          <tr>
+            <td><a href="{{ doc.doc_key }}" target="_blank" class="mono truncate" style="display:inline-block;max-width:180px;">{{ doc.doc_key | truncate(40) }}</a></td>
+            <td class="truncate" title="{{ doc.error_message or '' }}">{{ doc.error_message or 'Unknown' }}</td>
+            <td>{{ doc.discovered_at.strftime('%Y-%m-%d') if doc.discovered_at else '' }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="empty-state">No parse errors</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ===== GEOCODE REVIEW QUEUE ===== -->
+    <h2 id="geocode-queue">Geocode Review Queue ({{ geocode_queue | length }})</h2>
+    <div class="section">
+      {% if geocode_queue %}
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Sample Location</th>
+            <th>Neighborhood</th>
+            <th>Date</th>
+            <th>PFAS6</th>
+            <th>Resolve</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for r in geocode_queue %}
+        <tr>
+          <td>{{ r.id }}</td>
+          <td>{{ r.sample_location or 'Unknown' }}</td>
+          <td>{{ r.neighborhood or 'Unresolved' }}</td>
+          <td>{{ r.sample_date.strftime('%Y-%m-%d') if r.sample_date else '' }}</td>
+          <td>{{ '%.1f' | format(r.pfas6_sum | float) if r.pfas6_sum is not none else 'ND' }}</td>
+          <td>
+            <form method="post" action="/admin/geocode-resolve" class="form-inline" style="min-width:280px;">
+              <input type="hidden" name="result_id" value="{{ r.id }}">
+              <div class="form-row">
+                <input type="text" name="latitude" placeholder="Lat" style="width:90px;" required>
+              </div>
+              <div class="form-row">
+                <input type="text" name="longitude" placeholder="Lng" style="width:90px;" required>
+              </div>
+              <button type="submit" class="btn btn-primary btn-sm">Resolve</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="empty-state">No records pending geocode review</p>
+      {% endif %}
+    </div>
+
+    <!-- ===== SUBSCRIBER SUMMARY ===== -->
+    <h2>Subscribers</h2>
+    <div class="grid-2">
+      <div class="section">
+        <h3>Summary</h3>
+        <div class="stat-row"><span class="stat-label">Confirmed subscribers</span><span class="stat-value">{{ total_confirmed }}</span></div>
+        <div class="stat-row"><span class="stat-label">With mobile (SMS)</span><span class="stat-value">{{ with_mobile }}</span></div>
+      </div>
+      <div class="section">
+        <h3>By Neighborhood</h3>
+        {% if hood_counts %}
+        <table>
+          <thead><tr><th>Neighborhood</th><th>Count</th></tr></thead>
+          <tbody>
+          {% for hood, count in hood_counts %}
+          <tr><td>{{ hood }}</td><td>{{ count }}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="empty-state">No subscriptions yet</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ===== EDITABLE CONTENT ===== -->
+    <h2 id="editable-content">Editable Content</h2>
+    <div class="section">
+      <form method="post" action="/admin/save-config">
+        <h3>Municipal Water Warning</h3>
+        <div class="form-row">
+          <label for="water_warning_text">Warning text displayed on signup page</label>
+          <textarea id="water_warning_text" name="water_warning_text">{{ config_map.get('water_warning_text', 'Private well owners: ACKuifer monitors the Town of Nantucket Well Testing Program and the MassDEP Source Discovery Program. If you are on municipal water (Wannacomet Water), these results may not apply to you.') }}</textarea>
+        </div>
+
+        <h3 style="margin-top:1.2rem;">PFAS Info Page — Get Tested (Nantucket)</h3>
+        {% for i in range(1, 4) %}
+        <div class="form-row" style="display:grid;grid-template-columns:1fr 2fr;gap:0.5rem;">
+          <div>
+            <label>Link {{ i }} label</label>
+            <input type="text" name="pfas_info_tested_label_{{ i }}" value="{{ config_map.get('pfas_info_tested_label_' ~ i, '') }}">
+          </div>
+          <div>
+            <label>URL</label>
+            <input type="url" name="pfas_info_tested_url_{{ i }}" value="{{ config_map.get('pfas_info_tested_url_' ~ i, '') }}">
+          </div>
+        </div>
+        {% endfor %}
+
+        <h3 style="margin-top:1.2rem;">PFAS Info Page — Understand Your Results (MassDEP)</h3>
+        {% for i in range(1, 4) %}
+        <div class="form-row" style="display:grid;grid-template-columns:1fr 2fr;gap:0.5rem;">
+          <div>
+            <label>Link {{ i }} label</label>
+            <input type="text" name="pfas_info_results_label_{{ i }}" value="{{ config_map.get('pfas_info_results_label_' ~ i, '') }}">
+          </div>
+          <div>
+            <label>URL</label>
+            <input type="url" name="pfas_info_results_url_{{ i }}" value="{{ config_map.get('pfas_info_results_url_' ~ i, '') }}">
+          </div>
+        </div>
+        {% endfor %}
+
+        <h3 style="margin-top:1.2rem;">Email Digest Settings</h3>
+        <div class="form-row">
+          <label for="retest_window_days">Retest window (days) — results from the same street within this many days are flagged as retests in email digests</label>
+          <input type="number" id="retest_window_days" name="retest_window_days" min="1" max="365" value="{{ config_map.get('retest_window_days', '60') }}" style="max-width:120px;">
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="margin-top:1rem;">Save Content</button>
+      </form>
+    </div>
+
+  </div>
+</body>
+</html>

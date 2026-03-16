@@ -85,53 +85,37 @@
       Results at or below 20 ppt meet the state standard. Results above 20 ppt exceed it.
     </div>
 
+    {% if tested_links %}
     <div class="section">
       <h3>Get Tested &mdash; Nantucket</h3>
       <ul class="link-list">
+        {% for link in tested_links %}
         <li>
-          <a href="https://www.nantucket-ma.gov/1702/Well-Testing-Sampling" target="_blank" rel="noopener">
-            Well Testing &amp; Sampling
+          <a href="{{ link.url }}" target="_blank" rel="noopener">
+            {{ link.label }}
             <span class="source">Town of Nantucket</span>
           </a>
         </li>
-        <li>
-          <a href="https://www.nantucket-ma.gov/1700/PFAS-on-Nantucket" target="_blank" rel="noopener">
-            PFAS on Nantucket
-            <span class="source">Town of Nantucket</span>
-          </a>
-        </li>
-        <li>
-          <a href="https://www.nantucket-ma.gov/1701/Private-Well-Regulations" target="_blank" rel="noopener">
-            Private Well Regulations
-            <span class="source">Town of Nantucket</span>
-          </a>
-        </li>
+        {% endfor %}
       </ul>
     </div>
+    {% endif %}
 
+    {% if results_links %}
     <div class="section">
       <h3>Understand Your Results &mdash; MassDEP</h3>
       <ul class="link-list">
+        {% for link in results_links %}
         <li>
-          <a href="https://www.mass.gov/info-details/per-and-polyfluoroalkyl-substances-pfas-in-private-wells" target="_blank" rel="noopener">
-            PFAS in Private Wells FAQ
+          <a href="{{ link.url }}" target="_blank" rel="noopener">
+            {{ link.label }}
             <span class="source">Massachusetts DEP</span>
           </a>
         </li>
-        <li>
-          <a href="https://www.mass.gov/guides/how-to-interpret-your-drinking-water-lab-report" target="_blank" rel="noopener">
-            How to Interpret Your Lab Report
-            <span class="source">Massachusetts DEP</span>
-          </a>
-        </li>
-        <li>
-          <a href="https://www.mass.gov/info-details/point-of-use-treatment-system-study" target="_blank" rel="noopener">
-            Point-of-Use Treatment System Study
-            <span class="source">Massachusetts DEP</span>
-          </a>
-        </li>
+        {% endfor %}
       </ul>
     </div>
+    {% endif %}
 
     <div class="actions">
       <a href="/signup" class="btn-secondary">Sign up for PFAS alerts</a>
