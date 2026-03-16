@@ -482,6 +482,16 @@ def run_laserfiche_scraper(
             run.parse_errors = stats["parse_errors"]
             db.commit()
 
+    # Send notifications if the run succeeded and found new results
+    if final_status == "success" and stats["new_docs_parsed"] > 0:
+        try:
+            from app.notifications.engine import run_notifications
+            with SessionLocal() as db:
+                notif_summary = run_notifications(run_id, db)
+                logger.info("Notifications: %s", notif_summary)
+        except Exception:
+            logger.exception("Notification dispatch failed (scrape data is safe)")
+
     return {
         "run_id": run_id,
         "status": final_status,
