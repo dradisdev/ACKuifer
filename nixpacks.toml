@@ -1,0 +1,13 @@
+# Playwright requires Chromium + OS-level dependencies at runtime.
+# The 'chromium' phase runs after pip install and uses Playwright's
+# own installer to fetch the correct Chromium build with all deps.
+
+[phases.setup]
+nixPkgs = []
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
+
+[phases.chromium]
+dependsOn = ["install"]
+cmds = ["playwright install --with-deps chromium"]
