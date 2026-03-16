@@ -99,17 +99,21 @@ def _annotate_retests(rows: list) -> None:
             if days_apart > RETEST_WINDOW_DAYS:
                 continue
 
-            # This is a retest — determine direction
+            # Determine if this is a meaningful retest
             prev_val = prev["pfas6_sum"]
             curr_val = curr["pfas6_sum"]
 
-            # Within 10% = essentially unchanged
+            # Skip labeling non-detect → non-detect (no meaningful change)
             if prev_val == 0 and curr_val == 0:
-                arrow = "="
-            elif prev_val == 0:
-                arrow = "\u2191"  # ↑ up from zero
+                continue
+
+            # Determine direction
+            if prev_val == 0:
+                arrow = "\u2191"  # ↑ up from non-detect
+            elif curr_val == 0:
+                arrow = "\u2193"  # ↓ down to non-detect
             elif abs(curr_val - prev_val) / prev_val <= 0.10:
-                arrow = "="
+                arrow = "="  # within 10%, essentially unchanged
             elif curr_val > prev_val:
                 arrow = "\u2191"  # ↑
             else:
