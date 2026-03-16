@@ -1,13 +1,15 @@
 # ACKuifer Build Notes & Open Items
-# Updated: Session 4 (Laserfiche scraper integration)
+# Updated: Session 5 (MassDEP Source Discovery integration)
 # Keep this file in your project root and update as you go.
 
 ## KNOWN DATA ISSUES
 - Docs 260081 and 303051 had street_name=None due to Laserfiche viewer UI chrome 
   contaminating the address field. Parser fix applied in Step 4. Street names 
   manually corrected to "Beacon Lane" and "Quidnet Road" respectively.
-- 171 Source Discovery records have geocode_review_needed=True and no lat/lng. 
-  All excluded from map display until geocoded. Addressed in Step 5.
+- 171 Source Discovery records originally had no lat/lng. Batch geocoding
+  (Session 5) resolved 102 to display-ready (geocode_review_needed=False).
+  69 records still need manual review — either neighborhood centroid fallback
+  or Nominatim couldn't resolve them. See GEOCODING NOTES below.
 
 ## SCHEMA / DATABASE NOTES
 - Error queue is implemented as seen_documents.parse_status='error' (not a 
@@ -57,14 +59,42 @@
   (e.g. map_filter="21"). Useful for debugging specific maps.
 - Railway cron entry point: python3 -m app.scrapers.run_laserfiche
 
-## STEP 5 REMINDERS (MassDEP / Source Discovery)
-- pace_lab_parser.py: check PFHpS vs PFHpA mapping before integrating
-- pace_lab_parser.py: preserve STREET_EXPANSIONS table
-- All 171 Source Discovery records need geocoding — substantial task
-- Geocode review queue needed in admin interface for records where 
-  geocode_review_needed=True
-- EEA portal dedup key format: confirm URL-based vs document identifier 
-  before building seen_documents check
+## STEP 5 COMPLETION NOTES (MassDEP / Source Discovery)
+- PFHpS vs PFHpA: RESOLVED. Massachusetts PFAS6 regulatory sum (310 CMR 22.07G)
+  uses PFHpA (Perfluoroheptanoic acid, CAS 375-85-9), not PFHpS. Confirmed
+  against official MassDEP compound list. Production massdep.py uses PFHpA.
+  Full PFAS6 list: PFOA, PFOS, PFHxS, PFNA, PFHpA, PFDA.
+- app/scrapers/massdep.py (~900 lines) integrates all prototype files:
+  eea_monitor.py, source_discovery_parser.py, pace_lab_parser.py, sd_geocoder.py
+- Three PDF formats handled: lab_cert (EPA 537.1/533), pace_lab_cert (Pace
+  Analytical compiled), field_report (narrative with GPS tables)
+- Railway cron entry point: python3 -m app.scrapers.run_massdep
+- EEA portal dedup key: source='massdep', doc_key=<PDF URL>
+- Per-location uniqueness: source_doc_url = "{doc_url}#{well_id}"
+- Geocode review queue needed in admin interface for records where
+  geocode_review_needed=True (69 records as of Session 5)
+
+## GEOCODING NOTES
+- MapGeo API (nantucket.mapgeo.io) was completely down (404) during Session 5.
+  massdep.py _geocode_location() tries MapGeo first, falls back to Nominatim.
+  When MapGeo comes back online, newly scraped records should geocode better.
+- Nominatim has poor Nantucket coverage — many valid street addresses return
+  no results. Batch geocoding used 3-pass strategy with progressively more
+  aggressive query simplification.
+- 102/171 records display-ready (geocode_review_needed=False)
+- 69 records need manual geocoding or MapGeo recovery
+- Known well table in massdep.py maps VDT/MW/FRB IDs to approximate coords
+- Records with geocode_review_needed=True are excluded from /api/results
+
+## DISPLAY CLEANUP NOTES (api.py)
+- _clean_sd_street_name() in api.py: 9-step pipeline strips house numbers
+  (PRD Section 13), medium suffixes, depth brackets, well-unit suffixes,
+  city/state, and expands abbreviations via STREET_EXPANSIONS dict.
+- _well_id_to_street() maps VDT naming conventions to street names:
+  FG→Fairgrounds Road, WAITT→Waitt Drive, OSR/OS→Old South Road,
+  TW→Toms Way, TIC→Ticcoma Way, MADUK→Madaket Road.
+  Unresolved well IDs display as "Monitoring Well".
+- 22 unique street names verified in /api/results output.
 
 ## FUTURE / V2 REMINDERS
 - Paid tier: users.tier field defaults to 'free' — add 'paid' check before 
