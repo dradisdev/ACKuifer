@@ -38,7 +38,7 @@ class SourceDiscoveryResult(Base):
     __tablename__ = "source_discovery_results"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    source_doc_url = Column(Text, unique=True)
+    source_doc_url = Column(Text)
     sample_location = Column(Text)
     sample_date = Column(Date)
     pfos = Column(Numeric(8, 2), nullable=True)
@@ -52,5 +52,7 @@ class SourceDiscoveryResult(Base):
     neighborhood = Column(String, nullable=True)
     latitude = Column(Numeric(9, 6), nullable=True)
     longitude = Column(Numeric(9, 6), nullable=True)
+    depth = Column(Text, nullable=True)
+    medium = Column(Text, nullable=True)  # 'groundwater', 'drinking_water', 'soil'
     geocode_review_needed = Column(Boolean, default=False)
     notified_at = Column(DateTime(timezone=True), nullable=True)

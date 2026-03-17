@@ -1,13 +1,50 @@
 # ACKuifer Build Notes & Open Items
-# Updated: Session 4 (Laserfiche scraper integration)
+# Updated: Session 5 (Source Discovery data integrity fixes)
 # Keep this file in your project root and update as you go.
 
 ## KNOWN DATA ISSUES
-- Docs 260081 and 303051 had street_name=None due to Laserfiche viewer UI chrome 
-  contaminating the address field. Parser fix applied in Step 4. Street names 
+- Docs 260081 and 303051 had street_name=None due to Laserfiche viewer UI chrome
+  contaminating the address field. Parser fix applied in Step 4. Street names
   manually corrected to "Beacon Lane" and "Quidnet Road" respectively.
-- 171 Source Discovery records have geocode_review_needed=True and no lat/lng. 
+- 171 Source Discovery records have geocode_review_needed=True and no lat/lng.
   All excluded from map display until geocoded. Addressed in Step 5.
+
+## SOURCE DISCOVERY DATA INTEGRITY FIXES (Session 5, 2026-03-17)
+Three issues resolved in source_discovery_results:
+
+### 1. Schema: added depth and medium columns
+- Added `depth` (text, nullable) and `medium` (text, nullable) to
+  source_discovery_results table and SourceDiscoveryResult model.
+- Backfilled from existing sample_location strings:
+  - medium extracted from final parenthesized group (e.g. "(groundwater)")
+  - depth extracted from bracket/paren depth notation (e.g. "[0.5-0.75']")
+- Result: 94 drinking_water, 45 groundwater, 32 soil. All 32 soil records
+  have depth populated.
+
+### 2. Soil records excluded at query layer
+- Soil records retained in DB but excluded from map API (api.py) and
+  notification engine (engine.py) via `medium != 'soil'` filter.
+- Admin geocode review queue intentionally unfiltered (operator sees all).
+- 32 soil records are low-value (max PFAS6 = 1.25 ppt) but preserved for
+  data completeness.
+
+### 3. Cross-PDF duplicate merge and dedup fix
+- Identified 15 duplicate groups (same sample from different MassDEP PDFs).
+  Each PDF reported different compound subsets, so records had different
+  PFAS6 sums.
+- Merged compound values across duplicates: for each of 6 compounds, took
+  max non-null value. Recalculated pfas6_sum and result_status from merged
+  compounds using classify_result_status().
+- Updated 15 canonical records, deleted 27 duplicate records.
+  144 total records remain (was 171).
+- Notable: VDT-4FG-4 remains HIGH-DETECT at 22.33 ppt (merged 5 compounds
+  including PFHpA=8.62 from a secondary PDF).
+- Updated massdep.py _save_location() dedup logic:
+  - OLD: dedup by source_doc_url (same well from same PDF only)
+  - NEW: dedup by composite key (sample_location, sample_date, medium)
+  - When a match is found, merges compound values instead of skipping
+- Dropped unique constraint on source_doc_url column (no longer a dedup key).
+- seen_documents PDF-level dedup unchanged (still prevents re-downloading).
 
 ## SCHEMA / DATABASE NOTES
 - Error queue is implemented as seen_documents.parse_status='error' (not a 
@@ -68,8 +105,9 @@
 - All 171 Source Discovery records need geocoding — substantial task
 - Geocode review queue needed in admin interface for records where 
   geocode_review_needed=True
-- EEA portal dedup key format: confirm URL-based vs document identifier 
-  before building seen_documents check
+- EEA portal dedup key format: RESOLVED. Changed from URL-based to
+  composite key (sample_location, sample_date, medium) in _save_location().
+  seen_documents still uses doc_url for PDF-level dedup (prevent re-download).
 
 ## EMAIL DELIVERABILITY (post-launch polish)
 - Source document links in digest emails point to portal.laserfiche.com and 

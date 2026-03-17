@@ -1415,16 +1415,23 @@ def _process_eea_document(
 
 
 def _save_location(loc: dict, doc_url: str, stats: dict):
-    """Geocode and save a single sample location to DB."""
+    """Geocode and save a single sample location to DB.
+
+    Deduplicates by (sample_location, sample_date, medium) composite key.
+    When a match exists, merges compound values (max non-null per compound),
+    recalculates pfas6_sum and result_status.
+    """
     geo = _geocode_location(loc)
 
-    pfas6_raw = loc.get("pfas6")
-    pfas6_dec = Decimal(str(pfas6_raw)) if pfas6_raw is not None else None
-
     sample_date = _parse_sample_date(loc.get("sample_date"))
+    sample_date_val = sample_date.date() if sample_date else None
 
-    # Build a unique source_doc_url: base URL + well_id fragment for uniqueness
     well_id = loc.get("well_id", "unknown")
+    medium = loc.get("medium", "groundwater")
+    depth_ft = loc.get("depth_ft")
+    depth_str = str(depth_ft) if depth_ft is not None else None
+
+    # Build source_doc_url for record provenance (not used for dedup)
     unique_url = f"{doc_url}#{well_id}"
 
     neighborhood = lookup_neighborhood(geo["lat"], geo["lng"]) if geo["lat"] and geo["lng"] else FALLBACK_NEIGHBORHOOD
@@ -1436,33 +1443,67 @@ def _save_location(loc: dict, doc_url: str, stats: dict):
             return None
         return Decimal(str(val))
 
-    result = SourceDiscoveryResult(
-        source_doc_url=unique_url,
-        sample_location=well_id,
-        sample_date=sample_date.date() if sample_date else None,
-        pfos=to_dec(compounds.get("PFOS")),
-        pfoa=to_dec(compounds.get("PFOA")),
-        pfhxs=to_dec(compounds.get("PFHxS")),
-        pfna=to_dec(compounds.get("PFNA")),
-        pfhpa=to_dec(compounds.get("PFHpA")),
-        pfda=to_dec(compounds.get("PFDA")),
-        pfas6_sum=pfas6_dec,
-        result_status=loc.get("status", "NON-DETECT"),
-        neighborhood=neighborhood,
-        latitude=Decimal(str(geo["lat"])),
-        longitude=Decimal(str(geo["lng"])),
-        geocode_review_needed=geo["review_needed"],
-    )
+    compound_fields = {
+        "pfos": to_dec(compounds.get("PFOS")),
+        "pfoa": to_dec(compounds.get("PFOA")),
+        "pfhxs": to_dec(compounds.get("PFHxS")),
+        "pfna": to_dec(compounds.get("PFNA")),
+        "pfhpa": to_dec(compounds.get("PFHpA")),
+        "pfda": to_dec(compounds.get("PFDA")),
+    }
 
     with SessionLocal() as db:
-        # Check for duplicate (same well_id from same doc)
+        # Composite-key dedup: same sample from a different PDF gets merged
         existing = db.query(SourceDiscoveryResult).filter_by(
-            source_doc_url=unique_url,
+            sample_location=well_id,
+            sample_date=sample_date_val,
+            medium=medium,
         ).first()
+
         if existing:
-            logger.debug("  Skipping duplicate: %s", unique_url)
+            # Merge compounds: keep max non-null for each
+            merged_any = False
+            for field, new_val in compound_fields.items():
+                old_val = getattr(existing, field)
+                if new_val is not None:
+                    if old_val is None or new_val > old_val:
+                        setattr(existing, field, new_val)
+                        merged_any = True
+
+            if merged_any:
+                # Recalculate pfas6_sum from merged compounds
+                merged_vals = [
+                    float(getattr(existing, f))
+                    for f in compound_fields
+                    if getattr(existing, f) is not None
+                ]
+                new_pfas6 = round(sum(merged_vals), 2)
+                existing.pfas6_sum = Decimal(str(new_pfas6))
+                existing.result_status = classify_result_status(new_pfas6)
+                db.commit()
+                logger.info(
+                    "    Merged: %s PFAS6=%.1f status=%s (cross-PDF merge)",
+                    well_id, new_pfas6, existing.result_status,
+                )
+            else:
+                logger.debug("  Skipping duplicate (no new data): %s", well_id)
             return
 
+        # New record — insert with depth and medium
+        result = SourceDiscoveryResult(
+            source_doc_url=unique_url,
+            sample_location=well_id,
+            sample_date=sample_date_val,
+            **compound_fields,
+            pfas6_sum=to_dec(loc.get("pfas6")),
+            result_status=loc.get("status", "NON-DETECT"),
+            neighborhood=neighborhood,
+            latitude=Decimal(str(geo["lat"])),
+            longitude=Decimal(str(geo["lng"])),
+            depth=depth_str,
+            medium=medium,
+            geocode_review_needed=geo["review_needed"],
+        )
         db.add(result)
         db.commit()
 
@@ -1470,7 +1511,7 @@ def _save_location(loc: dict, doc_url: str, stats: dict):
     logger.info(
         "    Saved: %s PFAS6=%.1f status=%s neighborhood=%s geo=%s",
         well_id,
-        float(pfas6_dec) if pfas6_dec else 0,
+        float(to_dec(loc.get("pfas6")) or 0),
         loc.get("status"),
         neighborhood,
         geo["geocode_method"],
