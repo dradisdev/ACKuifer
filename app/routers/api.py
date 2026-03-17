@@ -173,6 +173,7 @@ def get_results(
             "sample_date": r.sample_date.isoformat() if r.sample_date else None,
             "source_doc_url": doc_url,
             "is_retest": False,
+            "retest_group_id": None,
         })
 
     # --- MassDEP Source Discovery results ---
@@ -203,6 +204,7 @@ def get_results(
             "sample_date": r.sample_date.isoformat() if r.sample_date else None,
             "source_doc_url": base_url,
             "is_retest": False,
+            "retest_group_id": None,
         })
 
     # --- Flag laserfiche retests ---
@@ -216,6 +218,7 @@ def get_results(
         if len(group) < 2:
             continue
         group.sort(key=lambda x: x["sample_date"] or "")
+        has_retest = False
         for i in range(1, len(group)):
             prev_date = group[i - 1]["sample_date"]
             curr_date = group[i]["sample_date"]
@@ -223,6 +226,11 @@ def get_results(
                 days_apart = (date.fromisoformat(curr_date) - date.fromisoformat(prev_date)).days
                 if days_apart <= retest_window:
                     group[i]["is_retest"] = True
+                    has_retest = True
+        if has_retest:
+            gid = group[0]["id"]
+            for r in group:
+                r["retest_group_id"] = gid
 
     return results
 
