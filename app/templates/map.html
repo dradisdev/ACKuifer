@@ -78,6 +78,7 @@
     }
     .retest-group-a { background: #edf2f7; }
     .retest-group-b { background: #e2ecf5; }
+    #results-table tbody tr[data-id]:hover { background: #ebf4ff !important; }
     /* Popup */
     .mapboxgl-popup-content { padding: 12px 16px; font-size: 0.85rem; line-height: 1.5; }
     .popup-source { font-size: 0.75rem; color: #718096; }
@@ -229,10 +230,12 @@ function makeMarker(result) {
 }
 
 let markers = [];
+let markerMap = new Map(); // id -> mapboxgl.Marker
 
 function clearMarkers() {
   markers.forEach(m => m.remove());
   markers = [];
+  markerMap.clear();
 }
 
 function getActiveStatuses() {
@@ -295,6 +298,7 @@ function renderMarkers() {
       .setPopup(popup)
       .addTo(map);
     markers.push(marker);
+    markerMap.set(r.id, marker);
   });
 
   // Update table
@@ -337,6 +341,9 @@ function renderMarkers() {
     const shadeClass = r.retest_group_id ? groupColors.get(r.retest_group_id) : '';
     const tr = document.createElement('tr');
     tr.className = shadeClass;
+    tr.dataset.id = r.id;
+    tr.style.cursor = 'pointer';
+    tr.title = 'Click to show on map';
     tr.innerHTML = `
       <td>${SOURCE_LABELS[r.source] || r.source}</td>
       <td>${r.neighborhood || '—'}</td>
@@ -352,6 +359,20 @@ function renderMarkers() {
     tbody.appendChild(tr);
   });
   document.getElementById('result-count').textContent = sorted.length;
+
+  // Delegated click listener for table rows (tbody.innerHTML='' clears old listeners)
+  tbody.addEventListener('click', function(e) {
+    const row = e.target.closest('tr[data-id]');
+    if (!row) return;
+    const marker = markerMap.get(row.dataset.id);
+    if (!marker) return;
+    const lngLat = marker.getLngLat();
+    map.flyTo({ center: [lngLat.lng, lngLat.lat], zoom: 15, speed: 1.5 });
+    // Enable scroll zoom when user interacts with map this way too
+    map.scrollZoom.enable();
+    // Open the popup after fly completes
+    map.once('moveend', () => marker.togglePopup());
+  });
 }
 
 // Fetch data and render
