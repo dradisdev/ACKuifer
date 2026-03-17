@@ -743,6 +743,17 @@ def _parse_pace_lab_cert(text: str, pages_text: list) -> list[dict]:
                     }
 
         if current_client_id and f"Client ID: {current_client_id}" in page_text:
+            # Skip QC pages — Lab Duplicate, Matrix Spike, Lab Control Sample,
+            # and Method Blank pages contain compound values that are not sample
+            # results. The parser previously grabbed these as if they were real
+            # samples, creating ghost records (e.g. id=115 "4", id=151 "20 TOMS").
+            if any(qc_header in page_text for qc_header in (
+                "Lab Duplicate Analysis",
+                "Matrix Spike Analysis",
+                "Lab Control Sample Analysis",
+                "Method Blank Analysis",
+            )):
+                continue
             for line in page_text.split('\n'):
                 cm = PACE_COMPOUND_LINE_RE.match(line)
                 if not cm:

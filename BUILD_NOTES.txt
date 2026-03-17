@@ -28,6 +28,20 @@
 - All VDT- well coordinates in KNOWN_WELL_COORDS are now verified against
   Google Maps parcel centroids. MW-1/2/3 (Airport Road) not yet verified.
 
+## QC PAGE PARSING FIX & DATA CLEANUP (Session 5, 2026-03-17)
+- Deleted 3 ghost records parsed from QC pages in Pace lab PDFs:
+  - id=96: VDT-TIC-11 [0.5- (groundwater) — 3538 ppt HAZARD — compound values
+    were CAS registry numbers, not concentrations. Truncated sample_location.
+  - id=115: "4" (groundwater) — 399.89 ppt — Lab Duplicate Analysis page for
+    4 TOMS WAY-3; Client ID wrapped across lines, parser captured only "4".
+  - id=151: "20 TOMS" (groundwater) — 83.15 ppt — Matrix Spike Analysis page for
+    20 TOMS WAY-3; Client ID wrapped, parser captured "20 TOMS".
+- Parser fix: compound extraction loop now skips pages containing QC headers
+  (Lab Duplicate Analysis, Matrix Spike Analysis, Lab Control Sample Analysis,
+  Method Blank Analysis) to prevent future ghost records.
+- Fixed VDT-TIC-11 and VDT-OS-8 soil record coordinates (were still using old
+  Shimmo values from before the coordinate fix).
+
 ## SOURCE DISCOVERY DATA INTEGRITY FIXES (Session 5, 2026-03-17)
 Three issues resolved in source_discovery_results:
 
