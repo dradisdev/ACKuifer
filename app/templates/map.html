@@ -163,6 +163,19 @@ const SOURCE_LABELS = {
 const MCL = 20.0;
 let allResults = [];
 
+const _urlParams = new URLSearchParams(window.location.search);
+const _searchLat = parseFloat(_urlParams.get('lat')) || null;
+const _searchLng = parseFloat(_urlParams.get('lng')) || null;
+const _searchNeighborhood = _urlParams.get('neighborhood') || null;
+function _haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
 const map = new mapboxgl.Map({
   container: 'map',
   style: 'mapbox://styles/mapbox/light-v11',
@@ -259,12 +272,20 @@ function renderMarkers() {
   // Update table
   const tbody = document.querySelector('#results-table tbody');
   tbody.innerHTML = '';
-  // Sort by date descending
-  const sorted = [...filtered].sort((a, b) => {
-    if (!a.sample_date) return 1;
-    if (!b.sample_date) return -1;
-    return b.sample_date.localeCompare(a.sample_date);
-  });
+  // Sort: by proximity to searched address if available, otherwise by date descending
+  let sorted;
+  if (_searchLat !== null && _searchLng !== null) {
+    sorted = [...filtered].sort((a, b) =>
+      _haversineKm(_searchLat, _searchLng, a.lat, a.lng) -
+      _haversineKm(_searchLat, _searchLng, b.lat, b.lng)
+    );
+  } else {
+    sorted = [...filtered].sort((a, b) => {
+      if (!a.sample_date) return 1;
+      if (!b.sample_date) return -1;
+      return b.sample_date.localeCompare(a.sample_date);
+    });
+  }
   sorted.forEach(r => {
     const aboveMCL = r.pfas6_sum !== null && r.pfas6_sum > MCL;
     const tr = document.createElement('tr');
@@ -285,9 +306,21 @@ function renderMarkers() {
 // Fetch data and render
 async function loadData() {
   try {
-    const resp = await fetch('/api/results');
+    const apiUrl = _searchNeighborhood
+      ? `/api/results?neighborhood=${encodeURIComponent(_searchNeighborhood)}`
+      : '/api/results';
+    const resp = await fetch(apiUrl);
     allResults = await resp.json();
     renderMarkers();
+    if (_searchLat !== null && _searchLng !== null) {
+      map.flyTo({ center: [_searchLng, _searchLat], zoom: 14.5, speed: 1.2 });
+      new mapboxgl.Marker({ color: '#1a3a5c' })
+        .setLngLat([_searchLng, _searchLat])
+        .setPopup(new mapboxgl.Popup({ offset: 25 }).setText(
+          _searchNeighborhood ? `Searched area: ${_searchNeighborhood}` : 'Searched location'
+        ))
+        .addTo(map);
+    }
   } catch (e) {
     console.error('Failed to load results:', e);
   }
