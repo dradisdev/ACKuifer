@@ -47,7 +47,20 @@
     .dot-hd { background: #dd6b20; }
     .dot-hz { background: #e53e3e; }
     /* Map container */
-    #map { width: 100%; height: calc(100vh - 220px); min-height: 400px; }
+    #map { width: 100%; height: calc(100vh - 220px); min-height: 400px; position: relative; }
+    #map-interact-overlay {
+      position: absolute; inset: 0; z-index: 1;
+      display: flex; align-items: center; justify-content: center;
+      background: transparent; cursor: pointer;
+      pointer-events: all;
+    }
+    #map-interact-overlay span {
+      background: rgba(0,0,0,0.55); color: #fff;
+      padding: 0.4rem 0.9rem; border-radius: 20px;
+      font-size: 0.82rem; pointer-events: none;
+      opacity: 0; transition: opacity 0.2s;
+    }
+    #map-interact-overlay:hover span { opacity: 1; }
     /* Disclaimer footer */
     .disclaimer-footer {
       padding: 0.8rem 1rem; background: #fffbeb; border-top: 1px solid #f6e05e;
@@ -140,7 +153,12 @@
     </div>
   </div>
 
-  <div id="map"></div>
+  <div style="position:relative;">
+    <div id="map"></div>
+    <div id="map-interact-overlay">
+      <span>Click to interact with map</span>
+    </div>
+  </div>
 
   <div class="table-section">
     <h2>Results (<span id="result-count">0</span>)</h2>
@@ -198,9 +216,25 @@ const map = new mapboxgl.Map({
   style: 'mapbox://styles/mapbox/light-v11',
   center: [-70.05, 41.28],
   zoom: 12.2,
+  scrollZoom: false,
 });
 
 map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+// Click-to-activate: enable scroll zoom on first click, hide overlay
+document.getElementById('map-interact-overlay').addEventListener('click', function() {
+  map.scrollZoom.enable();
+  this.style.display = 'none';
+});
+// Re-disable scroll zoom if user clicks outside the map, so
+// scrolling the page works normally again
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('#map')) {
+    map.scrollZoom.disable();
+    const overlay = document.getElementById('map-interact-overlay');
+    if (overlay) overlay.style.display = 'flex';
+  }
+});
 
 // Create marker element
 function makeMarker(result) {
