@@ -121,7 +121,10 @@
     const sel = document.getElementById('neighborhoods');
     if (!sel) return;
     Array.from(sel.options).forEach(opt => {
-      if (opt.value === nb) opt.selected = true;
+      if (opt.value === nb) {
+        opt.selected = true;
+        sel.scrollTop = opt.offsetTop - sel.offsetTop;
+      }
     });
   })();
 </script>
