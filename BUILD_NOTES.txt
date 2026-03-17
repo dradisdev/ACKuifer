@@ -1,5 +1,5 @@
 # ACKuifer Build Notes & Open Items
-# Updated: Session 5 (KNOWN_WELL_COORDS coordinate fix)
+# Updated: Session 6 (Source Discovery Data Quality)
 # Keep this file in your project root and update as you go.
 
 ## KNOWN DATA ISSUES
@@ -8,6 +8,34 @@
   manually corrected to "Beacon Lane" and "Quidnet Road" respectively.
 - 171 Source Discovery records have geocode_review_needed=True and no lat/lng.
   All excluded from map display until geocoded. Addressed in Step 5.
+
+## SESSION 6 CHANGES (Source Discovery Data Quality)
+- KNOWN_WELL_COORDS in massdep.py replaced with verified Google Maps parcel
+  centroids. Previous values were fabricated during Step 5 build and plotted in
+  Shimmo. All VDT wells now correctly placed: 4FG→4 Fairgrounds Rd,
+  2FG→2 Fairgrounds Rd, 6FG→6 Fairgrounds Rd, OS→Old South Rd, WAITT→Waitt Dr,
+  TIC→Ticcoma Way.
+- 3 ghost records deleted: id=96 (truncated sample_location, CAS numbers mistaken
+  for concentrations), id=115 and id=151 (QC page parsing artifacts — Lab
+  Duplicate and Matrix Spike pages).
+- massdep.py parser updated to skip QC pages (Lab Duplicate Analysis, Matrix
+  Spike Analysis, Lab Control Sample, Method Blank) during compound extraction.
+- 43 of 55 drinking_water geocode-review records resolved via suffix stripping
+  (_INF, _EFF, -R-3, -3, -M-3, -C-3, _2, -F) + Nominatim. 12 remain
+  (8 unresolved streets, 4 FRB wells).
+- clean_address column added to source_discovery_results for admin geocode queue
+  display.
+- ALERT LOGIC DECISION: drinking_water Source Discovery records alert same as
+  Laserfiche results. groundwater records (VDT monitoring wells) display on map
+  only, no alerts. soil records filtered from display entirely.
+- NOTE: if a drinking_water Source Discovery result and a Laserfiche result exist
+  for the same address, dedup alert logic needed to prevent double-alerting.
+  Handle in notification engine.
+- EEA portal has newer uningested PDFs: "Lab Data. PFAS. June-August 2025.pdf",
+  "Nantucket Data 04-09-25 Fairgrounds.pdf", "Nantucket Data 04-09-25
+  Landfill.pdf". Run massdep scraper to ingest before next map review.
+- Branch claude/objective-hoover ready to PR to main once geocode review is
+  complete.
 
 ## KNOWN_WELL_COORDS COORDINATE FIX (Session 5, 2026-03-17)
 - KNOWN_WELL_COORDS in massdep.py had fabricated coordinates that plotted in
@@ -186,14 +214,16 @@ Three issues resolved in source_discovery_results:
 - DMARC record still needs to be added to Squarespace DNS (see EMAIL DELIVERABILITY section)
 
 ## NEXT SESSION PRIORITIES
-1. Geocode review queue — work through 68 flagged Source Discovery records
-   in the admin panel at https://www.ackuifer.org/admin. Each record needs
-   manual lat/lng entry to appear on the map.
-2. First full Laserfiche scrape — trigger from admin panel, monitor closely,
-   expect 30-60 min runtime. Do one map group at a time initially.
-3. Operator handbook — document how to monitor, run scrapers, handle errors
-4. Post-launch polish (see EMAIL DELIVERABILITY section)
-5. Twilio/SMS setup — needs org account or volunteer, then activate sms.py
+1. Merge claude/objective-hoover to main via PR
+2. Resolve remaining 12 geocode-review records: 8 street addresses (Google Maps
+   lookups), 4 FRB wells (coordinates from SARSS site map PDF)
+3. Run massdep scraper to ingest newer EEA portal PDFs (April, June, August 2025
+   data)
+4. First full Laserfiche scrape — trigger from admin panel, monitor closely
+5. Notification engine — implement alert logic: drinking_water Source Discovery
+   alerts same as Laserfiche; groundwater display only; dedup check for
+   same-address results across both sources
+6. Operator handbook
 
 ## HOW TO START NEXT SESSION
 Upload CLAUDE.md and BUILD_NOTES.txt to a new chat with Claude.
