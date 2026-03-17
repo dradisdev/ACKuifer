@@ -48,10 +48,10 @@
     .dot-hz { background: #e53e3e; }
     /* Map container */
     #map { width: 100%; height: calc(100vh - 220px); min-height: 400px; }
-    /* Disclaimer */
-    .disclaimer {
-      padding: 0.6rem 1rem; background: #fffbeb; border-bottom: 1px solid #f6e05e;
-      font-size: 0.78rem; color: #744210; line-height: 1.4;
+    /* Disclaimer footer */
+    .disclaimer-footer {
+      padding: 0.8rem 1rem; background: #fffbeb; border-top: 1px solid #f6e05e;
+      font-size: 0.78rem; color: #744210; line-height: 1.6;
     }
     /* Table */
     .table-section { padding: 0.8rem 1rem; }
@@ -95,12 +95,6 @@
       <a href="/signup" id="get-alerts-link">Get alerts</a>
       <a href="/">Home</a>
     </div>
-  </div>
-
-  <div class="disclaimer">
-    MassDEP Source Discovery results reflect a targeted contamination investigation
-    and are not representative of typical residential well conditions.
-    Board of Health results reflect voluntary and pre-sale residential well tests.
   </div>
 
   <div class="controls">
@@ -377,5 +371,11 @@ if (_searchNeighborhood) {
   }
 }
 </script>
+
+  <div class="disclaimer-footer">
+    MassDEP Source Discovery results reflect a targeted contamination investigation
+    and are not representative of typical residential well conditions.
+    Board of Health results reflect voluntary and pre-sale residential well tests.
+  </div>
 </body>
 </html>
