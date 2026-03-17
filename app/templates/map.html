@@ -71,6 +71,11 @@
     .status-HIGH-DETECT { background: #dd6b20; }
     .status-HAZARD { background: #e53e3e; }
     .above-mcl { font-weight: 700; color: #e53e3e; }
+    .retest-badge {
+      display: inline-block; padding: 0.15rem 0.4rem; border-radius: 3px;
+      font-size: 0.72rem; font-weight: 600; color: #fff; background: #718096;
+      margin-left: 4px; vertical-align: middle;
+    }
     /* Popup */
     .mapboxgl-popup-content { padding: 12px 16px; font-size: 0.85rem; line-height: 1.5; }
     .popup-source { font-size: 0.75rem; color: #718096; }
@@ -294,7 +299,10 @@ function renderMarkers() {
       <td>${r.neighborhood || '—'}</td>
       <td>${r.street_name || '—'}</td>
       <td class="${aboveMCL ? 'above-mcl' : ''}">${formatValue(r)}${aboveMCL ? ' Above MCL' : ''}</td>
-      <td><span class="status-badge status-${r.result_status}">${r.result_status}</span></td>
+      <td>
+        <span class="status-badge status-${r.result_status}">${r.result_status}</span>
+        ${r.is_retest ? '<span class="retest-badge">Retest</span>' : ''}
+      </td>
       <td>${formatDate(r.sample_date)}</td>
       <td>${r.source_doc_url ? `<a href="${r.source_doc_url}" target="_blank">Report</a>` : '—'}</td>
     `;

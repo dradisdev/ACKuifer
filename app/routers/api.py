@@ -1,14 +1,17 @@
 """JSON API endpoints for the map frontend."""
 
 import re
+from collections import defaultdict
 from datetime import date, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.config import RETEST_WINDOW_DAYS
+from app.database import get_db, SessionLocal
 from app.models.results import PfasResult, SourceDiscoveryResult
+from app.models.site_config import SiteConfig
 from app.geo.parcel_lookup import lookup_parcel
 
 router = APIRouter(prefix="/api", tags=["api"])
@@ -163,10 +166,13 @@ def get_results(
             "lng": lng,
             "neighborhood": r.neighborhood,
             "street_name": r.street_name,
+            "map_number": r.map_number,
+            "parcel_number": r.parcel_number,
             "pfas6_sum": float(r.pfas6_sum) if r.pfas6_sum is not None else None,
             "result_status": r.result_status,
             "sample_date": r.sample_date.isoformat() if r.sample_date else None,
             "source_doc_url": doc_url,
+            "is_retest": False,
         })
 
     # --- MassDEP Source Discovery results ---
@@ -196,6 +202,37 @@ def get_results(
             "result_status": r.result_status,
             "sample_date": r.sample_date.isoformat() if r.sample_date else None,
             "source_doc_url": base_url,
+            "is_retest": False,
         })
 
+    # --- Flag laserfiche retests ---
+    retest_window = _get_retest_window_days(db)
+    parcels: dict[str, list[dict]] = defaultdict(list)
+    for r in results:
+        if r["source"] == "laserfiche" and r.get("map_number") and r.get("parcel_number"):
+            key = f"{r['map_number']}-{r['parcel_number']}"
+            parcels[key].append(r)
+    for key, group in parcels.items():
+        if len(group) < 2:
+            continue
+        group.sort(key=lambda x: x["sample_date"] or "")
+        for i in range(1, len(group)):
+            prev_date = group[i - 1]["sample_date"]
+            curr_date = group[i]["sample_date"]
+            if prev_date and curr_date:
+                days_apart = (date.fromisoformat(curr_date) - date.fromisoformat(prev_date)).days
+                if days_apart <= retest_window:
+                    group[i]["is_retest"] = True
+
     return results
+
+
+def _get_retest_window_days(db: Session) -> int:
+    """Read retest_window_days from site_config, falling back to config.py default."""
+    try:
+        row = db.query(SiteConfig).filter(SiteConfig.key == "retest_window_days").first()
+        if row and row.value:
+            return int(row.value)
+    except Exception:
+        pass
+    return RETEST_WINDOW_DAYS
