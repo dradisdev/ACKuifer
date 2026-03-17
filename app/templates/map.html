@@ -92,7 +92,7 @@
   <div class="topbar">
     <h1><a href="/">ACKuifer</a></h1>
     <div class="topbar-actions">
-      <a href="/signup">Get alerts</a>
+      <a href="/signup" id="get-alerts-link">Get alerts</a>
       <a href="/">Home</a>
     </div>
   </div>
@@ -368,6 +368,14 @@ map.on('load', () => {
   });
   loadData();
 });
+
+// Update "Get alerts" link to carry neighborhood into signup when a search is active
+if (_searchNeighborhood) {
+  const alertLink = document.getElementById('get-alerts-link');
+  if (alertLink) {
+    alertLink.href = `/signup?neighborhood=${encodeURIComponent(_searchNeighborhood)}`;
+  }
+}
 </script>
 </body>
 </html>
