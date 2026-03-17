@@ -1100,6 +1100,33 @@ def _parse_pdf(pdf_path: str) -> Optional[list[dict]]:
 # Geocoding (adapted from sd_geocoder.py)
 # =============================================================================
 
+def _clean_dw_sample_location(well_id: str) -> Optional[str]:
+    """Strip MassDEP sample-type suffixes from drinking_water well IDs to
+    produce a clean street address for geocoding.
+
+    Examples:
+        "22 TOMS WAY-R-3" → "22 Toms Way"
+        "11 FULLING MILL_INF" → "11 Fulling Mill"
+        "4 CACHALOT-F" → "4 Cachalot"
+        "22 TICCOMA-2" → "22 Ticcoma Way"
+        "FRB-ACK-4" → None  (non-address well ID)
+    """
+    name = well_id.strip()
+
+    # FRB wells are not street addresses
+    if re.match(r'^FRB[\s_-]', name, re.I):
+        return None
+
+    # Strip trailing sample type suffixes: -R-3, -M-3, -C-3, -3, _INF, _EFF, _2, -2, -F
+    name = re.sub(r'[-_](R-\d+|M-\d+|C-\d+|INF|EFF|F|\d+)$', '', name).strip()
+
+    # TICCOMA without "Way" → append "Way"
+    if re.search(r'TICCOMA\s*$', name, re.I):
+        name = name + ' Way'
+
+    return name.title()
+
+
 def _address_to_latlong(address: str) -> Optional[dict]:
     """Convert a Nantucket address to {lat, lng} via MapGeo API."""
     if "nantucket" not in address.lower():
@@ -1132,6 +1159,29 @@ def _address_to_latlong(address: str) -> Optional[dict]:
         return {"lat": coords[1], "lng": coords[0]}
     except Exception as e:
         logger.debug("MapGeo lookup failed for '%s': %s", address, e)
+        return None
+
+
+def _nominatim_geocode(address: str) -> Optional[dict]:
+    """Convert a Nantucket address to {lat, lng} via OpenStreetMap Nominatim.
+    Returns None if no result or result is off-island."""
+    full = f"{address}, Nantucket, MA"
+    encoded = urllib.parse.quote(full)
+    url = f"https://nominatim.openstreetmap.org/search?q={encoded}&format=json&limit=1"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "ACKuifer/1.0 (pfas-monitoring)"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+        if not data:
+            return None
+        lat, lng = float(data[0]["lat"]), float(data[0]["lon"])
+        # Sanity check: must be on Nantucket
+        if not (41.23 <= lat <= 41.31 and -70.12 <= lng <= -70.00):
+            logger.debug("Nominatim result off-island for '%s': %s, %s", full, lat, lng)
+            return None
+        return {"lat": lat, "lng": lng}
+    except Exception as e:
+        logger.debug("Nominatim lookup failed for '%s': %s", full, e)
         return None
 
 
@@ -1200,6 +1250,23 @@ def _geocode_location(loc: dict) -> dict:
             }
         time.sleep(0.3)
 
+    # Drinking water: strip MassDEP sample-type suffixes and geocode the
+    # cleaned street address via Nominatim
+    medium = loc.get("medium", "groundwater")
+    if medium == "drinking_water":
+        cleaned = _clean_dw_sample_location(well_id)
+        if cleaned:
+            coords = _nominatim_geocode(cleaned)
+            if coords:
+                return {
+                    "lat": coords["lat"],
+                    "lng": coords["lng"],
+                    "geocode_method": "nominatim_cleaned",
+                    "review_needed": False,
+                    "clean_address": cleaned,
+                }
+            time.sleep(1.1)
+
     # Address from Pace Client ID parsing
     if loc.get("address"):
         coords = _address_to_latlong(loc["address"])
@@ -1213,12 +1280,18 @@ def _geocode_location(loc: dict) -> dict:
         time.sleep(0.3)
 
     # Centroid fallback — flag for review
-    return {
+    result = {
         "lat": PROJECT_CENTROID["lat"],
         "lng": PROJECT_CENTROID["lng"],
         "geocode_method": "centroid_fallback",
         "review_needed": True,
     }
+    # For drinking_water, store cleaned address even on fallback
+    if medium == "drinking_water":
+        cleaned = _clean_dw_sample_location(well_id)
+        if cleaned:
+            result["clean_address"] = cleaned
+    return result
 
 
 def geocode_location(loc: dict) -> dict:
@@ -1497,7 +1570,7 @@ def _save_location(loc: dict, doc_url: str, stats: dict):
                 logger.debug("  Skipping duplicate (no new data): %s", well_id)
             return
 
-        # New record — insert with depth and medium
+        # New record — insert with depth, medium, and clean_address
         result = SourceDiscoveryResult(
             source_doc_url=unique_url,
             sample_location=well_id,
@@ -1510,6 +1583,7 @@ def _save_location(loc: dict, doc_url: str, stats: dict):
             longitude=Decimal(str(geo["lng"])),
             depth=depth_str,
             medium=medium,
+            clean_address=geo.get("clean_address"),
             geocode_review_needed=geo["review_needed"],
         )
         db.add(result)

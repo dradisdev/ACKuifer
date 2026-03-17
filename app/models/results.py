@@ -54,5 +54,6 @@ class SourceDiscoveryResult(Base):
     longitude = Column(Numeric(9, 6), nullable=True)
     depth = Column(Text, nullable=True)
     medium = Column(Text, nullable=True)  # 'groundwater', 'drinking_water', 'soil'
+    clean_address = Column(Text, nullable=True)
     geocode_review_needed = Column(Boolean, default=False)
     notified_at = Column(DateTime(timezone=True), nullable=True)
