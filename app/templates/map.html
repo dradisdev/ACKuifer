@@ -350,7 +350,23 @@ async function loadData() {
     allResults = await resp.json();
     renderMarkers();
     if (_searchLat !== null && _searchLng !== null) {
-      map.flyTo({ center: [_searchLng, _searchLat], zoom: 14.5, speed: 1.2 });
+      // Build bounds that include the search point plus all results within 3km
+      const nearbyCoords = allResults.filter(r => {
+        return _haversineKm(_searchLat, _searchLng, r.lat, r.lng) <= 3.0;
+      });
+      if (nearbyCoords.length > 0) {
+        // Fit to search point + nearby markers, with padding
+        const lngs = [_searchLng, ...nearbyCoords.map(r => r.lng)];
+        const lats = [_searchLat, ...nearbyCoords.map(r => r.lat)];
+        const bounds = [
+          [Math.min(...lngs), Math.min(...lats)],
+          [Math.max(...lngs), Math.max(...lats)],
+        ];
+        map.fitBounds(bounds, { padding: 80, maxZoom: 15, speed: 1.2 });
+      } else {
+        // No nearby results — just center on the search point
+        map.flyTo({ center: [_searchLng, _searchLat], zoom: 13, speed: 1.2 });
+      }
       new mapboxgl.Marker({ color: '#1a3a5c' })
         .setLngLat([_searchLng, _searchLat])
         .setPopup(new mapboxgl.Popup({ offset: 25 }).setText(
