@@ -52,25 +52,33 @@ ALL_COMPOUNDS = [
 ]
 
 # Known monitoring well coordinates for RTN 4-0029612
+# Source: Google Maps parcel centroids (verified 2026-03-17)
 KNOWN_WELL_COORDS: dict[str, dict] = {
-    "VDT-WAITT-12": {"lat": 41.2845, "lng": -70.0598, "address": "Waitt Drive, Nantucket"},
-    "VDT-4FG-4":    {"lat": 41.2801, "lng": -70.0623, "address": "4 Fairgrounds Road, Nantucket"},
-    "VDT-2FG-5":    {"lat": 41.2799, "lng": -70.0628, "address": "2 Fairgrounds Road, Nantucket"},
-    "VDT-2FG-6":    {"lat": 41.2797, "lng": -70.0631, "address": "2 Fairgrounds Road, Nantucket"},
-    "VDT-6FG-7":    {"lat": 41.2803, "lng": -70.0617, "address": "6 Fairgrounds Road, Nantucket"},
-    "VDT-6FG-8":    {"lat": 41.2806, "lng": -70.0612, "address": "6 Fairgrounds Road, Nantucket"},
-    "VDT-6FG-9":    {"lat": 41.2808, "lng": -70.0609, "address": "6 Fairgrounds Road, Nantucket"},
-    "VDT-6FG-10":   {"lat": 41.2810, "lng": -70.0605, "address": "6 Fairgrounds Road, Nantucket"},
-    "VDT-6FG-11":   {"lat": 41.2812, "lng": -70.0601, "address": "6 Fairgrounds Road, Nantucket"},
-    "VDT-OSR-1":    {"lat": 41.2825, "lng": -70.0585, "address": "Old South Road, Nantucket"},
-    "VDT-OSR-2":    {"lat": 41.2828, "lng": -70.0582, "address": "Old South Road, Nantucket"},
-    "VDT-OSR-3":    {"lat": 41.2831, "lng": -70.0578, "address": "Old South Road, Nantucket"},
+    # 4 Fairgrounds Road
+    "VDT-4FG-1":    {"lat": 41.267468, "lng": -70.087756, "address": "4 Fairgrounds Road, Nantucket"},
+    "VDT-4FG-2":    {"lat": 41.267468, "lng": -70.087756, "address": "4 Fairgrounds Road, Nantucket"},
+    "VDT-4FG-3":    {"lat": 41.267468, "lng": -70.087756, "address": "4 Fairgrounds Road, Nantucket"},
+    "VDT-4FG-4":    {"lat": 41.267468, "lng": -70.087756, "address": "4 Fairgrounds Road, Nantucket"},
+    # 2 Fairgrounds Road
+    "VDT-2FG-5":    {"lat": 41.268764, "lng": -70.086947, "address": "2 Fairgrounds Road, Nantucket"},
+    "VDT-2FG-6":    {"lat": 41.268764, "lng": -70.086947, "address": "2 Fairgrounds Road, Nantucket"},
+    "VDT-2FG-7":    {"lat": 41.268764, "lng": -70.086947, "address": "2 Fairgrounds Road, Nantucket"},
+    "VDT-2FG-9":    {"lat": 41.268764, "lng": -70.086947, "address": "2 Fairgrounds Road, Nantucket"},
+    # 6 Fairgrounds Road
+    "VDT-6FG-10":   {"lat": 41.267417, "lng": -70.088085, "address": "6 Fairgrounds Road, Nantucket"},
+    # Old South Road
+    "VDT-OS-8":     {"lat": 41.267879, "lng": -70.084221, "address": "Old South Road, Nantucket"},
+    # Waitt Drive
+    "VDT-WAITT-12": {"lat": 41.266763, "lng": -70.086734, "address": "Waitt Drive, Nantucket"},
+    # Ticcoma Way
+    "VDT-TIC-11":   {"lat": 41.266588, "lng": -70.088298, "address": "Ticcoma Way, Nantucket"},
+    # Airport-area wells (earlier MCP investigation)
     "MW-1":  {"lat": 41.2533, "lng": -70.0621, "address": "Airport Road, Nantucket"},
     "MW-2":  {"lat": 41.2539, "lng": -70.0615, "address": "Airport Road, Nantucket"},
     "MW-3":  {"lat": 41.2545, "lng": -70.0608, "address": "Airport Road, Nantucket"},
 }
 
-PROJECT_CENTROID = {"lat": 41.2802, "lng": -70.0625}
+PROJECT_CENTROID = {"lat": 41.2675, "lng": -70.0878}
 
 # Street name expansion table for Pace lab Client ID addresses
 STREET_EXPANSIONS = {

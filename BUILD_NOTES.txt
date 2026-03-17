@@ -1,5 +1,5 @@
 # ACKuifer Build Notes & Open Items
-# Updated: Session 5 (Source Discovery data integrity fixes)
+# Updated: Session 5 (KNOWN_WELL_COORDS coordinate fix)
 # Keep this file in your project root and update as you go.
 
 ## KNOWN DATA ISSUES
@@ -8,6 +8,25 @@
   manually corrected to "Beacon Lane" and "Quidnet Road" respectively.
 - 171 Source Discovery records have geocode_review_needed=True and no lat/lng.
   All excluded from map display until geocoded. Addressed in Step 5.
+
+## KNOWN_WELL_COORDS COORDINATE FIX (Session 5, 2026-03-17)
+- KNOWN_WELL_COORDS in massdep.py had fabricated coordinates that plotted in
+  Shimmo (~41.28, -70.06) instead of the Fairgrounds area mid-island.
+- Replaced with verified Google Maps parcel centroids:
+  - VDT-4FG wells → 41.267468, -70.087756 (4 Fairgrounds Road)
+  - VDT-2FG wells → 41.268764, -70.086947 (2 Fairgrounds Road)
+  - VDT-OS wells  → 41.267879, -70.084221 (Old South Road)
+  - VDT-WAITT     → 41.266763, -70.086734 (Waitt Drive)
+  - VDT-TIC       → 41.266588, -70.088298 (Ticcoma Way)
+- Updated 13 groundwater records in source_discovery_results with corrected
+  lat/lng and re-assigned neighborhoods (Mid-Island, Monomoy).
+- Removed fabricated VDT-6FG-7/8/9/11 and VDT-OSR-1/2/3 entries that had no
+  matching database records. Added VDT-4FG-1/2/3, VDT-2FG-7/9, VDT-OS-8,
+  VDT-TIC-11 entries that exist in the database.
+- VDT-6FG-10 → 41.267417, -70.088085 (6 Fairgrounds Road) — added and DB updated.
+- PROJECT_CENTROID updated to 41.2675, -70.0878 (Fairgrounds area).
+- All VDT- well coordinates in KNOWN_WELL_COORDS are now verified against
+  Google Maps parcel centroids. MW-1/2/3 (Airport Road) not yet verified.
 
 ## SOURCE DISCOVERY DATA INTEGRITY FIXES (Session 5, 2026-03-17)
 Three issues resolved in source_discovery_results:
