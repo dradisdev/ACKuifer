@@ -65,16 +65,18 @@ def search(address: str = Form(...)):
     neighborhood = lookup_neighborhood(lat, lng)
 
     params = urllib.parse.urlencode({
-        "neighborhood": neighborhood,
         "lat": f"{lat:.6f}",
         "lng": f"{lng:.6f}",
+        "neighborhood": neighborhood,
+        "search_address": address,
     })
     return RedirectResponse(url=f"/map?{params}", status_code=303)
 
 
 @router.get("/map", response_class=HTMLResponse)
-def map_page(request: Request):
+def map_page(request: Request, search_address: str = ""):
     return templates.TemplateResponse("map.html", {
         "request": request,
         "mapbox_token": settings.mapbox_public_token,
+        "search_address": search_address,
     })
