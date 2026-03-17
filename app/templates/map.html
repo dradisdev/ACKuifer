@@ -306,10 +306,7 @@ function renderMarkers() {
 // Fetch data and render
 async function loadData() {
   try {
-    const apiUrl = _searchNeighborhood
-      ? `/api/results?neighborhood=${encodeURIComponent(_searchNeighborhood)}`
-      : '/api/results';
-    const resp = await fetch(apiUrl);
+    const resp = await fetch('/api/results');
     allResults = await resp.json();
     renderMarkers();
     if (_searchLat !== null && _searchLng !== null) {
