@@ -372,7 +372,11 @@ function renderMarkers() {
     // Enable scroll zoom when user interacts with map this way too
     map.scrollZoom.enable();
     // Open the popup after fly completes
-    map.once('moveend', () => marker.togglePopup());
+    map.once('moveend', () => {
+      // Close any currently open popup first
+      markers.forEach(m => { if (m.getPopup().isOpen()) m.getPopup().remove(); });
+      marker.togglePopup();
+    });
   });
 }
 
