@@ -114,7 +114,8 @@ STREET_EXPANSIONS = {
     "NAUSHON":         "Naushon Way",
 }
 
-# MapGeo Nantucket GIS API base
+# MapGeo Nantucket GIS API base — DEPRECATED: returning 404 as of 2026-03-17.
+# Replaced by Nominatim in _geocode_location(). Retained in case MapGeo comes back.
 MAPGEO_BASE = "https://nantucket.mapgeo.io"
 
 # =============================================================================
@@ -1139,7 +1140,11 @@ def _clean_dw_sample_location(well_id: str) -> Optional[str]:
 
 
 def _address_to_latlong(address: str) -> Optional[dict]:
-    """Convert a Nantucket address to {lat, lng} via MapGeo API."""
+    """Convert a Nantucket address to {lat, lng} via MapGeo API.
+
+    DEPRECATED (2026-03-17): MapGeo API returning 404. Use _nominatim_geocode() instead.
+    Retained in case MapGeo comes back online.
+    """
     if "nantucket" not in address.lower():
         address = f"{address}, Nantucket, MA"
 
@@ -1179,7 +1184,7 @@ def _nominatim_geocode(address: str) -> Optional[dict]:
     Includes 1.1s pre-request delay to comply with Nominatim usage policy (max 1 req/sec).
     """
     time.sleep(1.1)  # Rate limit: Nominatim requires max 1 request per second
-    full = f"{address}, Nantucket, MA"
+    full = address if "nantucket" in address.lower() else f"{address}, Nantucket, MA"
     encoded = urllib.parse.quote(full)
     url = f"https://nominatim.openstreetmap.org/search?q={encoded}&format=json&limit=1"
     try:
@@ -1272,7 +1277,7 @@ def _geocode_location(loc: dict) -> dict:
     # Derive address from well ID
     derived = _derive_address_from_well_id(well_id)
     if derived:
-        coords = _address_to_latlong(derived)
+        coords = _nominatim_geocode(derived)
         if coords:
             return {
                 "lat": coords["lat"],
@@ -1280,7 +1285,6 @@ def _geocode_location(loc: dict) -> dict:
                 "geocode_method": "derived_address",
                 "review_needed": False,
             }
-        time.sleep(0.3)
 
     # Drinking water: strip MassDEP sample-type suffixes and geocode the
     # cleaned street address via Nominatim
@@ -1301,7 +1305,7 @@ def _geocode_location(loc: dict) -> dict:
 
     # Address from Pace Client ID parsing
     if loc.get("address"):
-        coords = _address_to_latlong(loc["address"])
+        coords = _nominatim_geocode(loc["address"])
         if coords:
             return {
                 "lat": coords["lat"],
@@ -1309,7 +1313,6 @@ def _geocode_location(loc: dict) -> dict:
                 "geocode_method": "client_id_address",
                 "review_needed": False,
             }
-        time.sleep(0.3)
 
     # Centroid fallback — flag for review
     result = {
