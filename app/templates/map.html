@@ -186,6 +186,14 @@ const _urlParams = new URLSearchParams(window.location.search);
 const _searchLat = parseFloat(_urlParams.get('lat')) || null;
 const _searchLng = parseFloat(_urlParams.get('lng')) || null;
 const _searchNeighborhood = _urlParams.get('neighborhood') || null;
+const _searchError = _urlParams.get('search_error') || null;
+if (_searchError) {
+  const errDiv = document.createElement('div');
+  errDiv.style.cssText = 'background:#fff3cd;color:#856404;border:1px solid #ffc107;padding:0.75rem 1rem;margin:0.5rem 1rem;border-radius:6px;font-size:0.9rem;';
+  errDiv.textContent = _searchError;
+  const mapEl = document.getElementById('map');
+  mapEl.parentNode.insertBefore(errDiv, mapEl);
+}
 function _haversineKm(lat1, lng1, lat2, lng2) {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;

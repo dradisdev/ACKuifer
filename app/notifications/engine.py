@@ -60,6 +60,7 @@ def run_notifications(scrape_run_id: str, db: Session) -> dict:
                 SourceDiscoveryResult.latitude.isnot(None),
                 SourceDiscoveryResult.longitude.isnot(None),
                 SourceDiscoveryResult.geocode_review_needed == False,
+                SourceDiscoveryResult.medium != "soil",
             )
             .all()
         )

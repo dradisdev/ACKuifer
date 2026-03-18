@@ -181,6 +181,7 @@ def get_results(
         SourceDiscoveryResult.latitude.isnot(None),
         SourceDiscoveryResult.longitude.isnot(None),
         SourceDiscoveryResult.geocode_review_needed == False,
+        SourceDiscoveryResult.medium != "soil",
     )
     if neighborhood:
         sd_query = sd_query.filter(SourceDiscoveryResult.neighborhood == neighborhood)

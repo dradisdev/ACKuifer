@@ -52,25 +52,33 @@ ALL_COMPOUNDS = [
 ]
 
 # Known monitoring well coordinates for RTN 4-0029612
+# Source: Google Maps parcel centroids (verified 2026-03-17)
 KNOWN_WELL_COORDS: dict[str, dict] = {
-    "VDT-WAITT-12": {"lat": 41.2845, "lng": -70.0598, "address": "Waitt Drive, Nantucket"},
-    "VDT-4FG-4":    {"lat": 41.2801, "lng": -70.0623, "address": "4 Fairgrounds Road, Nantucket"},
-    "VDT-2FG-5":    {"lat": 41.2799, "lng": -70.0628, "address": "2 Fairgrounds Road, Nantucket"},
-    "VDT-2FG-6":    {"lat": 41.2797, "lng": -70.0631, "address": "2 Fairgrounds Road, Nantucket"},
-    "VDT-6FG-7":    {"lat": 41.2803, "lng": -70.0617, "address": "6 Fairgrounds Road, Nantucket"},
-    "VDT-6FG-8":    {"lat": 41.2806, "lng": -70.0612, "address": "6 Fairgrounds Road, Nantucket"},
-    "VDT-6FG-9":    {"lat": 41.2808, "lng": -70.0609, "address": "6 Fairgrounds Road, Nantucket"},
-    "VDT-6FG-10":   {"lat": 41.2810, "lng": -70.0605, "address": "6 Fairgrounds Road, Nantucket"},
-    "VDT-6FG-11":   {"lat": 41.2812, "lng": -70.0601, "address": "6 Fairgrounds Road, Nantucket"},
-    "VDT-OSR-1":    {"lat": 41.2825, "lng": -70.0585, "address": "Old South Road, Nantucket"},
-    "VDT-OSR-2":    {"lat": 41.2828, "lng": -70.0582, "address": "Old South Road, Nantucket"},
-    "VDT-OSR-3":    {"lat": 41.2831, "lng": -70.0578, "address": "Old South Road, Nantucket"},
+    # 4 Fairgrounds Road
+    "VDT-4FG-1":    {"lat": 41.267468, "lng": -70.087756, "address": "4 Fairgrounds Road, Nantucket"},
+    "VDT-4FG-2":    {"lat": 41.267468, "lng": -70.087756, "address": "4 Fairgrounds Road, Nantucket"},
+    "VDT-4FG-3":    {"lat": 41.267468, "lng": -70.087756, "address": "4 Fairgrounds Road, Nantucket"},
+    "VDT-4FG-4":    {"lat": 41.267468, "lng": -70.087756, "address": "4 Fairgrounds Road, Nantucket"},
+    # 2 Fairgrounds Road
+    "VDT-2FG-5":    {"lat": 41.268764, "lng": -70.086947, "address": "2 Fairgrounds Road, Nantucket"},
+    "VDT-2FG-6":    {"lat": 41.268764, "lng": -70.086947, "address": "2 Fairgrounds Road, Nantucket"},
+    "VDT-2FG-7":    {"lat": 41.268764, "lng": -70.086947, "address": "2 Fairgrounds Road, Nantucket"},
+    "VDT-2FG-9":    {"lat": 41.268764, "lng": -70.086947, "address": "2 Fairgrounds Road, Nantucket"},
+    # 6 Fairgrounds Road
+    "VDT-6FG-10":   {"lat": 41.267417, "lng": -70.088085, "address": "6 Fairgrounds Road, Nantucket"},
+    # Old South Road
+    "VDT-OS-8":     {"lat": 41.267879, "lng": -70.084221, "address": "Old South Road, Nantucket"},
+    # Waitt Drive
+    "VDT-WAITT-12": {"lat": 41.266763, "lng": -70.086734, "address": "Waitt Drive, Nantucket"},
+    # Ticcoma Way
+    "VDT-TIC-11":   {"lat": 41.266588, "lng": -70.088298, "address": "Ticcoma Way, Nantucket"},
+    # Airport-area wells (earlier MCP investigation)
     "MW-1":  {"lat": 41.2533, "lng": -70.0621, "address": "Airport Road, Nantucket"},
     "MW-2":  {"lat": 41.2539, "lng": -70.0615, "address": "Airport Road, Nantucket"},
     "MW-3":  {"lat": 41.2545, "lng": -70.0608, "address": "Airport Road, Nantucket"},
 }
 
-PROJECT_CENTROID = {"lat": 41.2802, "lng": -70.0625}
+PROJECT_CENTROID = {"lat": 41.2675, "lng": -70.0878}
 
 # Street name expansion table for Pace lab Client ID addresses
 STREET_EXPANSIONS = {
@@ -106,7 +114,8 @@ STREET_EXPANSIONS = {
     "NAUSHON":         "Naushon Way",
 }
 
-# MapGeo Nantucket GIS API base
+# MapGeo Nantucket GIS API base — DEPRECATED: returning 404 as of 2026-03-17.
+# Replaced by Nominatim in _geocode_location(). Retained in case MapGeo comes back.
 MAPGEO_BASE = "https://nantucket.mapgeo.io"
 
 # =============================================================================
@@ -735,6 +744,17 @@ def _parse_pace_lab_cert(text: str, pages_text: list) -> list[dict]:
                     }
 
         if current_client_id and f"Client ID: {current_client_id}" in page_text:
+            # Skip QC pages — Lab Duplicate, Matrix Spike, Lab Control Sample,
+            # and Method Blank pages contain compound values that are not sample
+            # results. The parser previously grabbed these as if they were real
+            # samples, creating ghost records (e.g. id=115 "4", id=151 "20 TOMS").
+            if any(qc_header in page_text for qc_header in (
+                "Lab Duplicate Analysis",
+                "Matrix Spike Analysis",
+                "Lab Control Sample Analysis",
+                "Method Blank Analysis",
+            )):
+                continue
             for line in page_text.split('\n'):
                 cm = PACE_COMPOUND_LINE_RE.match(line)
                 if not cm:
@@ -1092,8 +1112,39 @@ def _parse_pdf(pdf_path: str) -> Optional[list[dict]]:
 # Geocoding (adapted from sd_geocoder.py)
 # =============================================================================
 
+def _clean_dw_sample_location(well_id: str) -> Optional[str]:
+    """Strip MassDEP sample-type suffixes from drinking_water well IDs to
+    produce a clean street address for geocoding.
+
+    Examples:
+        "22 TOMS WAY-R-3" → "22 Toms Way"
+        "11 FULLING MILL_INF" → "11 Fulling Mill"
+        "4 CACHALOT-F" → "4 Cachalot"
+        "22 TICCOMA-2" → "22 Ticcoma Way"
+        "FRB-ACK-4" → None  (non-address well ID)
+    """
+    name = well_id.strip()
+
+    # FRB wells are not street addresses
+    if re.match(r'^FRB[\s_-]', name, re.I):
+        return None
+
+    # Strip trailing sample type suffixes: -R-3, -M-3, -C-3, -3, _INF, _EFF, _2, -2, -F
+    name = re.sub(r'[-_](R-\d+|M-\d+|C-\d+|INF|EFF|F|\d+)$', '', name).strip()
+
+    # TICCOMA without "Way" → append "Way"
+    if re.search(r'TICCOMA\s*$', name, re.I):
+        name = name + ' Way'
+
+    return name.title()
+
+
 def _address_to_latlong(address: str) -> Optional[dict]:
-    """Convert a Nantucket address to {lat, lng} via MapGeo API."""
+    """Convert a Nantucket address to {lat, lng} via MapGeo API.
+
+    DEPRECATED (2026-03-17): MapGeo API returning 404. Use _nominatim_geocode() instead.
+    Retained in case MapGeo comes back online.
+    """
     if "nantucket" not in address.lower():
         address = f"{address}, Nantucket, MA"
 
@@ -1124,6 +1175,50 @@ def _address_to_latlong(address: str) -> Optional[dict]:
         return {"lat": coords[1], "lng": coords[0]}
     except Exception as e:
         logger.debug("MapGeo lookup failed for '%s': %s", address, e)
+        return None
+
+
+def _nominatim_geocode(address: str) -> Optional[dict]:
+    """Convert a Nantucket address to {lat, lng} via OpenStreetMap Nominatim.
+    Returns None if no result or result is off-island.
+    Includes 1.1s pre-request delay to comply with Nominatim usage policy (max 1 req/sec).
+    """
+    time.sleep(1.1)  # Rate limit: Nominatim requires max 1 request per second
+    full = address if "nantucket" in address.lower() else f"{address}, Nantucket, MA"
+    encoded = urllib.parse.quote(full)
+    url = f"https://nominatim.openstreetmap.org/search?q={encoded}&format=json&limit=1"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "ACKuifer/1.0 (pfas-monitoring)"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+        if not data:
+            return None
+        lat, lng = float(data[0]["lat"]), float(data[0]["lon"])
+        # Sanity check: must be on Nantucket
+        if not (41.23 <= lat <= 41.31 and -70.12 <= lng <= -70.00):
+            logger.debug("Nominatim result off-island for '%s': %s, %s", full, lat, lng)
+            return None
+        return {"lat": lat, "lng": lng}
+    except urllib.error.HTTPError as e:
+        if e.code == 429:
+            logger.warning("Nominatim rate limited (429) for '%s', retrying in 60s", full)
+            time.sleep(60)
+            try:
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = json.loads(resp.read())
+                if not data:
+                    return None
+                lat, lng = float(data[0]["lat"]), float(data[0]["lon"])
+                if not (41.23 <= lat <= 41.31 and -70.12 <= lng <= -70.00):
+                    return None
+                return {"lat": lat, "lng": lng}
+            except Exception:
+                logger.debug("Nominatim retry also failed for '%s'", full)
+                return None
+        logger.debug("Nominatim lookup failed for '%s': %s", full, e)
+        return None
+    except Exception as e:
+        logger.debug("Nominatim lookup failed for '%s': %s", full, e)
         return None
 
 
@@ -1182,7 +1277,7 @@ def _geocode_location(loc: dict) -> dict:
     # Derive address from well ID
     derived = _derive_address_from_well_id(well_id)
     if derived:
-        coords = _address_to_latlong(derived)
+        coords = _nominatim_geocode(derived)
         if coords:
             return {
                 "lat": coords["lat"],
@@ -1190,11 +1285,27 @@ def _geocode_location(loc: dict) -> dict:
                 "geocode_method": "derived_address",
                 "review_needed": False,
             }
-        time.sleep(0.3)
+
+    # Drinking water: strip MassDEP sample-type suffixes and geocode the
+    # cleaned street address via Nominatim
+    medium = loc.get("medium", "groundwater")
+    if medium == "drinking_water":
+        cleaned = _clean_dw_sample_location(well_id)
+        if cleaned:
+            coords = _nominatim_geocode(cleaned)
+            if coords:
+                return {
+                    "lat": coords["lat"],
+                    "lng": coords["lng"],
+                    "geocode_method": "nominatim_cleaned",
+                    "review_needed": False,
+                    "clean_address": cleaned,
+                }
+            time.sleep(1.1)
 
     # Address from Pace Client ID parsing
     if loc.get("address"):
-        coords = _address_to_latlong(loc["address"])
+        coords = _nominatim_geocode(loc["address"])
         if coords:
             return {
                 "lat": coords["lat"],
@@ -1202,15 +1313,20 @@ def _geocode_location(loc: dict) -> dict:
                 "geocode_method": "client_id_address",
                 "review_needed": False,
             }
-        time.sleep(0.3)
 
     # Centroid fallback — flag for review
-    return {
+    result = {
         "lat": PROJECT_CENTROID["lat"],
         "lng": PROJECT_CENTROID["lng"],
         "geocode_method": "centroid_fallback",
         "review_needed": True,
     }
+    # For drinking_water, store cleaned address even on fallback
+    if medium == "drinking_water":
+        cleaned = _clean_dw_sample_location(well_id)
+        if cleaned:
+            result["clean_address"] = cleaned
+    return result
 
 
 def geocode_location(loc: dict) -> dict:
@@ -1415,16 +1531,23 @@ def _process_eea_document(
 
 
 def _save_location(loc: dict, doc_url: str, stats: dict):
-    """Geocode and save a single sample location to DB."""
+    """Geocode and save a single sample location to DB.
+
+    Deduplicates by (sample_location, sample_date, medium) composite key.
+    When a match exists, merges compound values (max non-null per compound),
+    recalculates pfas6_sum and result_status.
+    """
     geo = _geocode_location(loc)
 
-    pfas6_raw = loc.get("pfas6")
-    pfas6_dec = Decimal(str(pfas6_raw)) if pfas6_raw is not None else None
-
     sample_date = _parse_sample_date(loc.get("sample_date"))
+    sample_date_val = sample_date.date() if sample_date else None
 
-    # Build a unique source_doc_url: base URL + well_id fragment for uniqueness
     well_id = loc.get("well_id", "unknown")
+    medium = loc.get("medium", "groundwater")
+    depth_ft = loc.get("depth_ft")
+    depth_str = str(depth_ft) if depth_ft is not None else None
+
+    # Build source_doc_url for record provenance (not used for dedup)
     unique_url = f"{doc_url}#{well_id}"
 
     neighborhood = lookup_neighborhood(geo["lat"], geo["lng"]) if geo["lat"] and geo["lng"] else FALLBACK_NEIGHBORHOOD
@@ -1436,33 +1559,68 @@ def _save_location(loc: dict, doc_url: str, stats: dict):
             return None
         return Decimal(str(val))
 
-    result = SourceDiscoveryResult(
-        source_doc_url=unique_url,
-        sample_location=well_id,
-        sample_date=sample_date.date() if sample_date else None,
-        pfos=to_dec(compounds.get("PFOS")),
-        pfoa=to_dec(compounds.get("PFOA")),
-        pfhxs=to_dec(compounds.get("PFHxS")),
-        pfna=to_dec(compounds.get("PFNA")),
-        pfhpa=to_dec(compounds.get("PFHpA")),
-        pfda=to_dec(compounds.get("PFDA")),
-        pfas6_sum=pfas6_dec,
-        result_status=loc.get("status", "NON-DETECT"),
-        neighborhood=neighborhood,
-        latitude=Decimal(str(geo["lat"])),
-        longitude=Decimal(str(geo["lng"])),
-        geocode_review_needed=geo["review_needed"],
-    )
+    compound_fields = {
+        "pfos": to_dec(compounds.get("PFOS")),
+        "pfoa": to_dec(compounds.get("PFOA")),
+        "pfhxs": to_dec(compounds.get("PFHxS")),
+        "pfna": to_dec(compounds.get("PFNA")),
+        "pfhpa": to_dec(compounds.get("PFHpA")),
+        "pfda": to_dec(compounds.get("PFDA")),
+    }
 
     with SessionLocal() as db:
-        # Check for duplicate (same well_id from same doc)
+        # Composite-key dedup: same sample from a different PDF gets merged
         existing = db.query(SourceDiscoveryResult).filter_by(
-            source_doc_url=unique_url,
+            sample_location=well_id,
+            sample_date=sample_date_val,
+            medium=medium,
         ).first()
+
         if existing:
-            logger.debug("  Skipping duplicate: %s", unique_url)
+            # Merge compounds: keep max non-null for each
+            merged_any = False
+            for field, new_val in compound_fields.items():
+                old_val = getattr(existing, field)
+                if new_val is not None:
+                    if old_val is None or new_val > old_val:
+                        setattr(existing, field, new_val)
+                        merged_any = True
+
+            if merged_any:
+                # Recalculate pfas6_sum from merged compounds
+                merged_vals = [
+                    float(getattr(existing, f))
+                    for f in compound_fields
+                    if getattr(existing, f) is not None
+                ]
+                new_pfas6 = round(sum(merged_vals), 2)
+                existing.pfas6_sum = Decimal(str(new_pfas6))
+                existing.result_status = classify_result_status(new_pfas6)
+                db.commit()
+                logger.info(
+                    "    Merged: %s PFAS6=%.1f status=%s (cross-PDF merge)",
+                    well_id, new_pfas6, existing.result_status,
+                )
+            else:
+                logger.debug("  Skipping duplicate (no new data): %s", well_id)
             return
 
+        # New record — insert with depth, medium, and clean_address
+        result = SourceDiscoveryResult(
+            source_doc_url=unique_url,
+            sample_location=well_id,
+            sample_date=sample_date_val,
+            **compound_fields,
+            pfas6_sum=to_dec(loc.get("pfas6")),
+            result_status=loc.get("status", "NON-DETECT"),
+            neighborhood=neighborhood,
+            latitude=Decimal(str(geo["lat"])),
+            longitude=Decimal(str(geo["lng"])),
+            depth=depth_str,
+            medium=medium,
+            clean_address=geo.get("clean_address"),
+            geocode_review_needed=geo["review_needed"],
+        )
         db.add(result)
         db.commit()
 
@@ -1470,7 +1628,7 @@ def _save_location(loc: dict, doc_url: str, stats: dict):
     logger.info(
         "    Saved: %s PFAS6=%.1f status=%s neighborhood=%s geo=%s",
         well_id,
-        float(pfas6_dec) if pfas6_dec else 0,
+        float(to_dec(loc.get("pfas6")) or 0),
         loc.get("status"),
         neighborhood,
         geo["geocode_method"],

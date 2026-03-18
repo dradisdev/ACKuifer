@@ -1,6 +1,7 @@
 """Map and landing page routes."""
 
 import logging
+import time
 import urllib.parse
 
 import httpx
@@ -18,6 +19,39 @@ templates = Jinja2Templates(directory="app/templates")
 
 # Nantucket bounding box for Nominatim viewbox bias
 _NANTUCKET_VIEWBOX = "-70.30,41.22,-69.93,41.34"
+
+
+def _nominatim_search(address: str) -> list:
+    """Call Nominatim search API with retry on 429."""
+    resp = httpx.get(
+        "https://nominatim.openstreetmap.org/search",
+        params={
+            "q": address,
+            "format": "json",
+            "limit": 1,
+            "viewbox": _NANTUCKET_VIEWBOX,
+            "bounded": 1,
+        },
+        headers={"User-Agent": "ACKuifer/1.0 (ackuifer.org)"},
+        timeout=10.0,
+    )
+    if resp.status_code == 429:
+        logger.warning("Nominatim rate limited (429), retrying in 60s")
+        time.sleep(60)
+        resp = httpx.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={
+                "q": address,
+                "format": "json",
+                "limit": 1,
+                "viewbox": _NANTUCKET_VIEWBOX,
+                "bounded": 1,
+            },
+            headers={"User-Agent": "ACKuifer/1.0 (ackuifer.org)"},
+            timeout=10.0,
+        )
+    resp.raise_for_status()
+    return resp.json()
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -38,27 +72,16 @@ def search(address: str = Form(...)):
         address = f"{address}, Nantucket, MA"
 
     try:
-        resp = httpx.get(
-            "https://nominatim.openstreetmap.org/search",
-            params={
-                "q": address,
-                "format": "json",
-                "limit": 1,
-                "viewbox": _NANTUCKET_VIEWBOX,
-                "bounded": 1,
-            },
-            headers={"User-Agent": "ACKuifer/1.0 (ackuifer.org)"},
-            timeout=10.0,
-        )
-        resp.raise_for_status()
-        results = resp.json()
+        results = _nominatim_search(address)
     except Exception:
         logger.exception("Nominatim geocode failed for: %s", address)
-        return RedirectResponse(url="/map", status_code=303)
+        error = urllib.parse.urlencode({"search_error": "Address search is temporarily unavailable — please try again in a few minutes."})
+        return RedirectResponse(url=f"/map?{error}", status_code=303)
 
     if not results:
         logger.info("No geocode results for: %s", address)
-        return RedirectResponse(url="/map", status_code=303)
+        error = urllib.parse.urlencode({"search_error": f"No results found for \"{address}\". Try a street address like \"10 Surfside Road\"."})
+        return RedirectResponse(url=f"/map?{error}", status_code=303)
 
     lat = float(results[0]["lat"])
     lng = float(results[0]["lon"])
