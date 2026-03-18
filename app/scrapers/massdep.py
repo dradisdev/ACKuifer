@@ -1175,7 +1175,10 @@ def _address_to_latlong(address: str) -> Optional[dict]:
 
 def _nominatim_geocode(address: str) -> Optional[dict]:
     """Convert a Nantucket address to {lat, lng} via OpenStreetMap Nominatim.
-    Returns None if no result or result is off-island."""
+    Returns None if no result or result is off-island.
+    Includes 1.1s pre-request delay to comply with Nominatim usage policy (max 1 req/sec).
+    """
+    time.sleep(1.1)  # Rate limit: Nominatim requires max 1 request per second
     full = f"{address}, Nantucket, MA"
     encoded = urllib.parse.quote(full)
     url = f"https://nominatim.openstreetmap.org/search?q={encoded}&format=json&limit=1"
@@ -1191,6 +1194,24 @@ def _nominatim_geocode(address: str) -> Optional[dict]:
             logger.debug("Nominatim result off-island for '%s': %s, %s", full, lat, lng)
             return None
         return {"lat": lat, "lng": lng}
+    except urllib.error.HTTPError as e:
+        if e.code == 429:
+            logger.warning("Nominatim rate limited (429) for '%s', retrying in 60s", full)
+            time.sleep(60)
+            try:
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = json.loads(resp.read())
+                if not data:
+                    return None
+                lat, lng = float(data[0]["lat"]), float(data[0]["lon"])
+                if not (41.23 <= lat <= 41.31 and -70.12 <= lng <= -70.00):
+                    return None
+                return {"lat": lat, "lng": lng}
+            except Exception:
+                logger.debug("Nominatim retry also failed for '%s'", full)
+                return None
+        logger.debug("Nominatim lookup failed for '%s': %s", full, e)
+        return None
     except Exception as e:
         logger.debug("Nominatim lookup failed for '%s': %s", full, e)
         return None
