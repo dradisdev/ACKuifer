@@ -83,6 +83,13 @@
     .mapboxgl-popup-content { padding: 12px 16px; font-size: 0.85rem; line-height: 1.5; }
     .popup-source { font-size: 0.75rem; color: #718096; }
     .popup-value { font-weight: 700; }
+    .popup-debug { margin-top: 6px; padding-top: 6px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #999; font-family: monospace; }
+    /* Admin debug toggle button */
+    #debug-toggle-btn {
+      font-size: 12px; padding: 4px 8px; background: #f7fafc;
+      border: 1px solid #cbd5e0; border-radius: 4px; cursor: pointer; color: #4a5568;
+    }
+    #debug-toggle-btn.active { background: #ebf8ff; color: #2b6cb0; border-color: #90cdf4; }
     @media (max-width: 600px) {
       .controls { font-size: 0.8rem; gap: 0.5rem; }
       #map { height: calc(100vh - 260px); }
@@ -97,7 +104,6 @@
       <a href="/">Home</a>
     </div>
   </div>
-
   <div class="controls">
     <div class="control-group">
       <form method="post" action="/search" style="display:flex;gap:0.4rem;align-items:center;">
@@ -140,10 +146,13 @@
         <option value="30">Last 30 days</option>
       </select>
     </div>
+    {% if is_admin %}
+    <div class="control-group">
+      <button id="debug-toggle-btn" onclick="toggleAdminDebug()">🔍 IDs</button>
+    </div>
+    {% endif %}
   </div>
-
   <div id="map"></div>
-
   <div class="table-section">
     <h2>Results (<span id="result-count">0</span>)</h2>
     <div style="overflow-x:auto;">
@@ -163,25 +172,38 @@
       </table>
     </div>
   </div>
-
 <script>
 mapboxgl.accessToken = '{{ mapbox_token }}';
-
+// Debug mode: enabled via ?debug=1 (no login required) or admin toggle button (login required)
+const DEBUG_MODE = {{ 'true' if debug_mode else 'false' }};
+let adminDebugMode = localStorage.getItem('ackuifer_admin_debug') === 'true';
+function isDebugActive() {
+  return DEBUG_MODE || adminDebugMode;
+}
+function toggleAdminDebug() {
+  adminDebugMode = !adminDebugMode;
+  localStorage.setItem('ackuifer_admin_debug', adminDebugMode);
+  const btn = document.getElementById('debug-toggle-btn');
+  if (btn) btn.classList.toggle('active', adminDebugMode);
+  renderMarkers();
+}
+// Apply persisted admin debug state to button on load
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('debug-toggle-btn');
+  if (btn && adminDebugMode) btn.classList.add('active');
+});
 const STATUS_COLORS = {
   'NON-DETECT': '#38a169',
   'DETECT': '#d69e2e',
   'HIGH-DETECT': '#dd6b20',
   'HAZARD': '#e53e3e',
 };
-
 const SOURCE_LABELS = {
   'laserfiche': 'Board of Health',
   'massdep': 'MassDEP Source Discovery',
 };
-
 const MCL = 20.0;
 let allResults = [];
-
 const _urlParams = new URLSearchParams(window.location.search);
 const _searchLat = parseFloat(_urlParams.get('lat')) || null;
 const _searchLng = parseFloat(_urlParams.get('lng')) || null;
@@ -202,7 +224,6 @@ function _haversineKm(lat1, lng1, lat2, lng2) {
             Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLng/2)**2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
-
 const map = new mapboxgl.Map({
   container: 'map',
   style: 'mapbox://styles/mapbox/light-v11',
@@ -211,19 +232,15 @@ const map = new mapboxgl.Map({
   scrollZoom: false,
   cooperativeGestures: true,
 });
-
 map.addControl(new mapboxgl.NavigationControl(), 'top-right');
-
 // Scroll-zoom hint
 const scrollHint = document.createElement('div');
 scrollHint.style.cssText = 'position:absolute;bottom:28px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.45);color:#fff;font-size:0.75rem;padding:0.25rem 0.7rem;border-radius:12px;pointer-events:none;white-space:nowrap;';
 scrollHint.textContent = 'Pinch or use +\u2212 to zoom';
 document.getElementById('map').appendChild(scrollHint);
-// Fade out after 4 seconds
 setTimeout(() => scrollHint.style.transition = 'opacity 1s', 3000);
 setTimeout(() => scrollHint.style.opacity = '0', 4000);
 setTimeout(() => scrollHint.remove(), 5000);
-
 // Create marker element
 function makeMarker(result) {
   const el = document.createElement('div');
@@ -238,31 +255,25 @@ function makeMarker(result) {
   }
   return el;
 }
-
 let markers = [];
 let markerMap = new Map(); // id -> mapboxgl.Marker
-
 function clearMarkers() {
   markers.forEach(m => m.remove());
   markers = [];
   markerMap.clear();
 }
-
 function getActiveStatuses() {
   return Array.from(document.querySelectorAll('.status-cb:checked')).map(cb => cb.value);
 }
-
 function getTimeDays() {
   return parseInt(document.getElementById('time-filter').value) || 0;
 }
-
 function filterResults() {
   const showLF = document.getElementById('toggle-lf').checked;
   const showSD = document.getElementById('toggle-sd').checked;
   const statuses = getActiveStatuses();
   const days = getTimeDays();
   const cutoff = days > 0 ? new Date(Date.now() - days * 86400000) : null;
-
   return allResults.filter(r => {
     if (r.source === 'laserfiche' && !showLF) return false;
     if (r.source === 'massdep' && !showSD) return false;
@@ -273,36 +284,40 @@ function filterResults() {
     return true;
   });
 }
-
 function formatValue(r) {
   if (r.pfas6_sum === null || r.pfas6_sum === 0) return 'Non-detect';
   return r.pfas6_sum.toFixed(1) + ' ppt';
 }
-
 function formatDate(d) {
   if (!d) return '—';
   const dt = new Date(d + 'T00:00:00');
   return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
-
+function buildPopupHtml(r) {
+  const valueStr = formatValue(r);
+  const aboveMCL = r.pfas6_sum !== null && r.pfas6_sum > MCL;
+  const debugLine = isDebugActive()
+    ? `<div class="popup-debug">id: ${r.id} &nbsp;|&nbsp; src: ${r.source}</div>`
+    : '';
+  return `
+    <div>
+      <strong>${r.street_name || 'Unknown location'}</strong><br>
+      <span class="popup-value">${valueStr}</span>
+      ${aboveMCL ? ' <span style="color:#e53e3e;font-weight:700;">Above MCL</span>' : ''}<br>
+      ${formatDate(r.sample_date)}<br>
+      <span class="popup-source">${SOURCE_LABELS[r.source] || r.source}</span><br>
+      ${r.source_doc_url ? `<a href="${r.source_doc_url}" target="_blank" rel="noopener">View report</a>` : ''}
+      ${debugLine}
+    </div>
+  `;
+}
 function renderMarkers() {
   clearMarkers();
   const filtered = filterResults();
-
   filtered.forEach(r => {
     const el = makeMarker(r);
-    const valueStr = formatValue(r);
-    const aboveMCL = r.pfas6_sum !== null && r.pfas6_sum > MCL;
-    const popup = new mapboxgl.Popup({ offset: 10, maxWidth: '280px' }).setHTML(`
-      <div>
-        <strong>${r.street_name || 'Unknown location'}</strong><br>
-        <span class="popup-value">${valueStr}</span>
-        ${aboveMCL ? ' <span style="color:#e53e3e;font-weight:700;">Above MCL</span>' : ''}<br>
-        ${formatDate(r.sample_date)}<br>
-        <span class="popup-source">${SOURCE_LABELS[r.source] || r.source}</span><br>
-        ${r.source_doc_url ? `<a href="${r.source_doc_url}" target="_blank" rel="noopener">View report</a>` : ''}
-      </div>
-    `);
+    const popup = new mapboxgl.Popup({ offset: 10, maxWidth: '280px' })
+      .setHTML(buildPopupHtml(r));
     const marker = new mapboxgl.Marker({ element: el })
       .setLngLat([r.lng, r.lat])
       .setPopup(popup)
@@ -310,7 +325,6 @@ function renderMarkers() {
     markers.push(marker);
     markerMap.set(r.id, marker);
   });
-
   // Update table
   const tbody = document.querySelector('#results-table tbody');
   tbody.innerHTML = '';
@@ -369,7 +383,6 @@ function renderMarkers() {
     tbody.appendChild(tr);
   });
   document.getElementById('result-count').textContent = sorted.length;
-
   // Delegated click listener for table rows (tbody.innerHTML='' clears old listeners)
   tbody.addEventListener('click', function(e) {
     const row = e.target.closest('tr[data-id]');
@@ -378,17 +391,13 @@ function renderMarkers() {
     if (!marker) return;
     const lngLat = marker.getLngLat();
     map.flyTo({ center: [lngLat.lng, lngLat.lat], zoom: 15, speed: 1.5 });
-    // Enable scroll zoom when user interacts with map this way too
     map.scrollZoom.enable();
-    // Open the popup after fly completes
     map.once('moveend', () => {
-      // Close any currently open popup first
       markers.forEach(m => { if (m.getPopup().isOpen()) m.getPopup().remove(); });
       marker.togglePopup();
     });
   });
 }
-
 // Fetch data and render
 async function loadData() {
   try {
@@ -396,12 +405,10 @@ async function loadData() {
     allResults = await resp.json();
     renderMarkers();
     if (_searchLat !== null && _searchLng !== null) {
-      // Build bounds that include the search point plus all results within 3km
       const nearbyCoords = allResults.filter(r => {
         return _haversineKm(_searchLat, _searchLng, r.lat, r.lng) <= 3.0;
       });
       if (nearbyCoords.length > 0) {
-        // Fit to search point + nearby markers, with padding
         const lngs = [_searchLng, ...nearbyCoords.map(r => r.lng)];
         const lats = [_searchLat, ...nearbyCoords.map(r => r.lat)];
         const bounds = [
@@ -410,7 +417,6 @@ async function loadData() {
         ];
         map.fitBounds(bounds, { padding: 80, maxZoom: 15, speed: 1.2 });
       } else {
-        // No nearby results — just center on the search point
         map.flyTo({ center: [_searchLng, _searchLat], zoom: 13, speed: 1.2 });
       }
       new mapboxgl.Marker({ color: '#1a3a5c' })
@@ -424,15 +430,12 @@ async function loadData() {
     console.error('Failed to load results:', e);
   }
 }
-
 // Event listeners for controls
 document.getElementById('toggle-lf').addEventListener('change', renderMarkers);
 document.getElementById('toggle-sd').addEventListener('change', renderMarkers);
 document.querySelectorAll('.status-cb').forEach(cb => cb.addEventListener('change', renderMarkers));
 document.getElementById('time-filter').addEventListener('change', renderMarkers);
-
 map.on('load', () => {
-  // Privacy: hide building footprints so individual parcels aren't identifiable
   map.getStyle().layers.forEach(layer => {
     if (layer.id.includes('building')) {
       map.setLayoutProperty(layer.id, 'visibility', 'none');
@@ -440,7 +443,6 @@ map.on('load', () => {
   });
   loadData();
 });
-
 // Update "Get alerts" link to carry neighborhood into signup when a search is active
 if (_searchNeighborhood) {
   const alertLink = document.getElementById('get-alerts-link');
@@ -449,7 +451,6 @@ if (_searchNeighborhood) {
   }
 }
 </script>
-
   <div class="disclaimer-footer">
     MassDEP Source Discovery results reflect a targeted contamination investigation
     and are not representative of typical residential well conditions.

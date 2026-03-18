@@ -97,9 +97,14 @@ def search(address: str = Form(...)):
 
 
 @router.get("/map", response_class=HTMLResponse)
-def map_page(request: Request, search_address: str = ""):
+def map_page(request: Request, search_address: str = "", debug: int = 0):
+    # Check for admin session — is_admin gates the persistent toggle button in the UI.
+    # ?debug=1 works for anyone and doesn't require login.
+    is_admin = request.session.get("is_admin", False) if hasattr(request, "session") else False
     return templates.TemplateResponse("map.html", {
         "request": request,
         "mapbox_token": settings.mapbox_public_token,
         "search_address": search_address,
+        "debug_mode": debug == 1,
+        "is_admin": is_admin,
     })

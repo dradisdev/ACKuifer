@@ -113,81 +113,122 @@ Three issues resolved in source_discovery_results:
 - seen_documents PDF-level dedup unchanged (still prevents re-downloading).
 
 ## SCHEMA / DATABASE NOTES
-- Error queue is implemented as seen_documents.parse_status='error' (not a 
-  separate error_queue table). Admin interface (Step 8) must query 
+- Error queue is implemented as seen_documents.parse_status='error' (not a
+  separate error_queue table). Admin interface (Step 8) must query
   seen_documents WHERE parse_status='error' for the parse error queue display.
-- seen_documents uses doc_key + source columns to handle both Laserfiche doc IDs 
+- seen_documents uses doc_key + source columns to handle both Laserfiche doc IDs
   and EEA PDF URLs in one table.
 
 ## PARSER NOTES
-- Boundary bug in prototype: test_report_parser.py and pace_lab_parser.py both 
-  use <= 89.9 instead of < 90.0 for HIGH-DETECT. Fixed in production via 
+- Boundary bug in prototype: test_report_parser.py and pace_lab_parser.py both
+  use <= 89.9 instead of < 90.0 for HIGH-DETECT. Fixed in production via
   classify_result_status() in config.py. Do not reuse prototype status logic.
-- pace_lab_parser.py has PFHpS instead of PFHpA in REGULATED_ABBREVS — may need 
-  mapping when integrating in Step 5. Verify against actual Source Discovery 
+- pace_lab_parser.py has PFHpS instead of PFHpA in REGULATED_ABBREVS — may need
+  mapping when integrating in Step 5. Verify against actual Source Discovery
   report field names before building massdep.py.
-- pace_lab_parser.py STREET_EXPANSIONS table is valuable — preserve it during 
+- pace_lab_parser.py STREET_EXPANSIONS table is valuable — preserve it during
   Step 5 integration.
-- address_lookup.py is NOT needed for scraper integration — map/parcel comes 
+- address_lookup.py is NOT needed for scraper integration — map/parcel comes
   from folder path. Operator utility only.
 
 ## WATER SERVICE AREA (DEFERRED)
-- MassGIS pwsdep_pt/ layer contains well source point locations, NOT service 
+- MassGIS pwsdep_pt/ layer contains well source point locations, NOT service
   area polygons. Not suitable for municipal water soft warning feature.
-- check_municipal_water() is stubbed in config.py — assumes no address is on 
+- check_municipal_water() is stubbed in config.py — assumes no address is on
   municipal water.
-- To implement properly: need service area boundary polygon from Wannacomet 
-  Water Company (operating name for Nantucket Water Works). 
+- To implement properly: need service area boundary polygon from Wannacomet
+  Water Company (operating name for Nantucket Water Works).
   Recommended: email Wannacomet directly requesting a service area shapefile.
 - Feature should remain stubbed until proper polygon is obtained.
 
 ## NEIGHBORHOOD DATA NOTES
 - Final neighborhood list has 23 neighborhoods (Sconset merged into Siasconset).
-- 14 features are OSM polygons; 10 were added manually as Points with 
-  approximate coordinates: Brant Point, Dionis, Madequecham, Miacomet, 
+- 14 features are OSM polygons; 10 were added manually as Points with
+  approximate coordinates: Brant Point, Dionis, Madequecham, Miacomet,
   Mid-Island, Nobadeer, Sconset(removed), The Cliff, Tom Nevers, Town.
-- Point-based neighborhoods use nearest-point assignment rather than 
-  polygon containment — less precise. Consider obtaining proper polygon 
+- Point-based neighborhoods use nearest-point assignment rather than
+  polygon containment — less precise. Consider obtaining proper polygon
   boundaries from Town GIS for a future update.
-- Tom Nevers coverage was ambiguous in original OSM export — verify assignments 
+- Tom Nevers coverage was ambiguous in original OSM export — verify assignments
   look correct once Source Discovery records are geocoded.
 
 ## SCRAPER NOTES
-- Full-island Laserfiche traversal not yet run end-to-end. Only Map 21 tested 
-  in prototype and Task 4 validation. First full run will be a significant 
+- Full-island Laserfiche traversal not yet run end-to-end. Only Map 21 tested
+  in prototype and Task 4 validation. First full run will be a significant
   operation — monitor closely.
-- Laserfiche scraper uses map_filter parameter for targeted testing 
+- Laserfiche scraper uses map_filter parameter for targeted testing
   (e.g. map_filter="21"). Useful for debugging specific maps.
 - Railway cron entry point: python3 -m app.scrapers.run_laserfiche
 
 ## STEP 5 REMINDERS (MassDEP / Source Discovery)
-- PFHpS vs PFHpA: RESOLVED. Massachusetts PFAS6 regulatory sum (310 CMR 22.07G) 
-  uses PFHpA (Perfluoroheptanoic acid, CAS 375-85-9), not PFHpS. Confirmed 
-  against official MassDEP compound list. Laserfiche scraper is CORRECT using 
-  PFHpA. Source Discovery prototype parsers (source_discovery_parser.py and 
-  pace_lab_parser.py) have a bug using PFHpS — corrected in massdep.py to use 
+- PFHpS vs PFHpA: RESOLVED. Massachusetts PFAS6 regulatory sum (310 CMR 22.07G)
+  uses PFHpA (Perfluoroheptanoic acid, CAS 375-85-9), not PFHpS. Confirmed
+  against official MassDEP compound list. Laserfiche scraper is CORRECT using
+  PFHpA. Source Discovery prototype parsers (source_discovery_parser.py and
+  pace_lab_parser.py) have a bug using PFHpS — corrected in massdep.py to use
   PFHpA. Full PFAS6 list: PFOA, PFOS, PFHxS, PFNA, PFHpA, PFDA.
 - pace_lab_parser.py: preserve STREET_EXPANSIONS table
 - All 171 Source Discovery records need geocoding — substantial task
-- Geocode review queue needed in admin interface for records where 
+- Geocode review queue needed in admin interface for records where
   geocode_review_needed=True
 - EEA portal dedup key format: RESOLVED. Changed from URL-based to
   composite key (sample_location, sample_date, medium) in _save_location().
   seen_documents still uses doc_url for PDF-level dedup (prevent re-download).
 
+## MAP / FRONTEND NOTES (added Session 5)
+- Address search: geocodes via Nominatim → redirects to /map?lat=&lng=
+  &neighborhood=&search_address=. Frontend reads params, flies map via
+  fitBounds to include all results within 3km, sorts table by proximity.
+  No neighborhood filtering applied — polygon boundaries too imprecise,
+  proximity sort is sufficient.
+- Results table: proximity sort after search, date-descending on full map
+  view. 3km proximity cutoff for table display (markers still show all).
+  Retest logic: laserfiche-only, same parcel within operator-configured
+  window (default 60 days). Retests flagged with grey "Retest" badge.
+  Retest pairs share retest_group_id for row shading. Shading uses
+  alternating .retest-group-a / .retest-group-b CSS classes.
+- Table rows are clickable — flies map to marker and opens popup. Closes
+  any previously open popup first.
+- Map scroll behavior: scrollZoom: false always. cooperativeGestures: true
+  for iPad/touch (two-finger required). Desktop gets a scroll hint that
+  fades after 4 seconds.
+- Persistent address search box in controls bar. Stays populated after
+  search via search_address param passed through redirect.
+- "Get alerts" link in topbar carries ?neighborhood= param when a search
+  is active. Signup page pre-selects and scrolls to that neighborhood.
+- Mobile number field on signup is commented out pending Twilio setup.
+  Look for "SMS DISABLED: Twilio not yet configured" comment in signup.html.
+- Disclaimer bar moved to page footer (.disclaimer-footer).
+- Time filter options: All time / Last year / Last 6 months / Last 30 days.
+- iOS autocorrect note: if a user reports wrong geocode result on iPhone/iPad,
+  check whether autocorrect mangled the street name before submission.
+  Confirmed Nominatim geocodes Sesachacha Rd correctly from server side —
+  likely user/autocorrect error, not a code bug.
+
+## FRONTEND PASS BACKLOG
+- In full-island date-sort view, retest pairs can be separated by
+  intervening results from other addresses. Consider sorting by group anchor
+  date (most recent date in the group) so retest pairs always cluster
+  together. Low priority — proximity sort (post-search) handles it correctly
+  since pairs have identical distances.
+- Retest group shading colors (#edf2f7 / #e2ecf5) should be reviewed for
+  accessibility contrast during design pass.
+- Overall design/styling pass still ahead — current UI is functional but
+  unstyled. Retest badge, status colors, and table layout all TBD.
+
 ## EMAIL DELIVERABILITY (post-launch polish)
-- Source document links in digest emails point to portal.laserfiche.com and 
-  MassDEP EEA portal — Resend flags these as mismatched sending domain. Fix: 
-  route all source document links through ackuifer.org as a redirect proxy 
-  (e.g. /r?url=https://portal.laserfiche.com/...) so all email links are on 
+- Source document links in digest emails point to portal.laserfiche.com and
+  MassDEP EEA portal — Resend flags these as mismatched sending domain. Fix:
+  route all source document links through ackuifer.org as a redirect proxy
+  (e.g. /r?url=https://portal.laserfiche.com/...) so all email links are on
   ackuifer.org. Implement as a simple GET /r route in the app.
 - DMARC record missing from DNS. Add TXT record to Squarespace:
   Host: _dmarc
   Value: v=DMARC1; p=none
   (no rua reporting address — do not put any personal email in public DNS)
-- Paid tier: users.tier field defaults to 'free' — add 'paid' check before 
+- Paid tier: users.tier field defaults to 'free' — add 'paid' check before
   gating any features in v2
-- Island-wide consolidated digest planned for v2 (currently one email per 
+- Island-wide consolidated digest planned for v2 (currently one email per
   neighborhood)
 - Multiple recipients per subscription planned for v2
 - SMS for all detections (not just near-MCL) planned for v2
@@ -195,17 +236,18 @@ Three issues resolved in source_discovery_results:
 
 ## ADMIN INTERFACE REMINDERS (Step 8)
 - Parse error queue: query seen_documents WHERE parse_status='error'
-- Geocode review queue: query source_discovery_results WHERE 
-  geocode_review_needed=True — operator needs to enter corrected lat/lng 
+- Geocode review queue: query source_discovery_results WHERE
+  geocode_review_needed=True — operator needs to enter corrected lat/lng
   and mark as resolved
-- Editable content panel needed for: municipal water warning text, PFAS info 
-  page links (section headings, labels, URLs) — must be editable without 
+- Editable content panel needed for: municipal water warning text, PFAS info
+  page links (section headings, labels, URLs) — must be editable without
   code deploy
 - Dead man's switch: separate status indicators for each scraper independently
 - Manual trigger buttons for each scraper independently
 
-## DEPLOYMENT STATUS (as of March 16, 2026)
+## DEPLOYMENT STATUS (as of March 17, 2026)
 - Live at: https://www.ackuifer.org
+- Frontend QA and UX pass complete (Session 5)
 - Railway project: ACKuifer (hearty-solace)
 - Three Railway services running:
   * Web service — FastAPI app, continuous
@@ -216,7 +258,7 @@ Three issues resolved in source_discovery_results:
 - SSL: Auto-provisioned by Railway via Let's Encrypt
 - Database: Railway managed PostgreSQL (internal URL in all three services)
 - Building footprint privacy fix applied (Mapbox style changed to light-v11)
-- DMARC record still needs to be added to Squarespace DNS (see EMAIL DELIVERABILITY section)
+- DMARC record still needs to be added to Squarespace DNS (see EMAIL DELIVERABILITY)
 
 ## NEXT SESSION PRIORITIES
 1. Merge claude/objective-hoover to main via PR
