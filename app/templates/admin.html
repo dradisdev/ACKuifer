@@ -208,6 +208,7 @@
             <th>Neighborhood</th>
             <th>Date</th>
             <th>PFAS6</th>
+            <th>Report</th>
             <th>Resolve</th>
           </tr>
         </thead>
@@ -219,6 +220,7 @@
           <td>{{ r.neighborhood or 'Unresolved' }}</td>
           <td>{{ r.sample_date.strftime('%Y-%m-%d') if r.sample_date else '' }}</td>
           <td>{{ '%.1f' | format(r.pfas6_sum | float) if r.pfas6_sum is not none else 'ND' }}</td>
+          <td>{% if r.source_doc_url %}<a href="{{ r.source_doc_url }}" target="_blank" rel="noopener">View PDF</a>{% else %}—{% endif %}</td>
           <td>
             <form method="post" action="/admin/geocode-resolve" class="form-inline" style="min-width:280px;">
               <input type="hidden" name="result_id" value="{{ r.id }}">

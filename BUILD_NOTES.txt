@@ -244,6 +244,7 @@ Three issues resolved in source_discovery_results:
   code deploy
 - Dead man's switch: separate status indicators for each scraper independently
 - Manual trigger buttons for each scraper independently
+- Geocode review queue now shows source PDF link alongside each flagged record — operator can open the PDF to find coordinates for non-address sample points (e.g. VDT-OS-8 soil borings).
 
 ## DEPLOYMENT STATUS (as of March 17, 2026)
 - Live at: https://www.ackuifer.org
