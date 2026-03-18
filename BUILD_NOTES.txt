@@ -246,7 +246,7 @@ Three issues resolved in source_discovery_results:
 - Manual trigger buttons for each scraper independently
 - Geocode review queue now shows source PDF link alongside each flagged record — operator can open the PDF to find coordinates for non-address sample points (e.g. VDT-OS-8 soil borings).
 
-## DEPLOYMENT STATUS (as of March 17, 2026)
+## DEPLOYMENT STATUS (as of March 18, 2026)
 - Live at: https://www.ackuifer.org
 - Frontend QA and UX pass complete (Session 5)
 - Railway project: ACKuifer (hearty-solace)
@@ -260,18 +260,50 @@ Three issues resolved in source_discovery_results:
 - Database: Railway managed PostgreSQL (internal URL in all three services)
 - Building footprint privacy fix applied (Mapbox style changed to light-v11)
 - DMARC record still needs to be added to Squarespace DNS (see EMAIL DELIVERABILITY)
+- Debug popup toggle added: ?debug=1 shows record id and source on any
+  popup (no login required). Admin toggle button stubbed, wired to
+  is_admin=False until Step 8 session auth is connected.
+- Source PDF link added to geocode review queue in admin panel.
+- Railway query editor unreliable for SELECT — documented in KNOWN RAILWAY
+  LIMITATIONS section.
 
 ## NEXT SESSION PRIORITIES
-1. Merge claude/objective-hoover to main via PR
-2. Resolve remaining 12 geocode-review records: 8 street addresses (Google Maps
-   lookups), 4 FRB wells (coordinates from SARSS site map PDF)
-3. Run massdep scraper to ingest newer EEA portal PDFs (April, June, August 2025
-   data)
-4. First full Laserfiche scrape — trigger from admin panel, monitor closely
-5. Notification engine — implement alert logic: drinking_water Source Discovery
-   alerts same as Laserfiche; groundwater display only; dedup check for
-   same-address results across both sources
-6. Operator handbook
+1. GitHub MCP connection — connect Claude to the GitHub repo so Claude can
+   read current file versions directly, eliminating the stale-file problem.
+   Research: https://github.com/modelcontextprotocol/servers — look for
+   GitHub MCP server. One-time setup, pays off every session after.
+2. Geocode review queue — work through flagged Source Discovery records in
+   the admin panel. Each record now shows a PDF link — open it, find the
+   sample point on the site map, enter coordinates.
+3. First full Laserfiche scrape — trigger from admin panel, monitor closely,
+   expect 30-60 min runtime. Do one map group at a time initially.
+4. Operator handbook — document how to monitor, run scrapers, handle errors.
+5. Twilio/SMS setup — uncomment mobile field in signup.html when ready.
+6. Post-launch polish (see EMAIL DELIVERABILITY section).
+
+## SESSION SETUP GUIDE
+Always upload CLAUDE.md and BUILD_NOTES.txt at the start of every session.
+Upload any code file just before asking Claude to modify it — not speculatively
+at session start. If Claude Code warns that a replacement would remove features,
+STOP and ask Claude for a targeted edit instead.
+Starting prompt template:
+  ACKuifer is live at ackuifer.org. Uploading CLAUDE.md and BUILD_NOTES.txt
+  for context. Session goal: [FEATURE BUILD / BUG FIX / QA PASS / OPERATIONS]
+  [one sentence describing the goal]
+Session types:
+- FEATURE BUILD: name the feature, reference NEXT SESSION PRIORITIES
+- BUG FIX: describe the bug and affected files, upload files before editing
+- QA/UX PASS: identify all issues before writing any code
+- OPERATIONS: geocode fixes, scraper runs, data checks
+
+## KNOWN RAILWAY LIMITATIONS
+- Railway PostgreSQL Data tab query editor returns 0 rows on most SELECT
+  queries even when data exists. COUNT(*) works. Use targeted UPDATEs
+  carefully — you cannot verify the before state visually.
+- For geocode fixes, use the admin geocode review queue, not raw SQL.
+- Cron services auto-execute on schedule immediately after first deploy —
+  no manual start needed or expected.
+- DNS must use www.ackuifer.org (not root domain) for Railway CNAME.
 
 ## HOW TO START NEXT SESSION
 Upload CLAUDE.md and BUILD_NOTES.txt to a new chat with Claude.
