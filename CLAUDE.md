@@ -152,6 +152,11 @@ app/
 
 ---
 
+## Git Workflow
+Commit directly to the current branch. Do not create feature branches unless explicitly asked.
+
+---
+
 ## Deployment (Railway)
 Three Railway services in one project:
 1. **Web service** — FastAPI app (`uvicorn app.main:app`)
