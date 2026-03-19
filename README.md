@@ -84,7 +84,7 @@ ACKuifer/
 
 ```bash
 # Clone the repo
-git clone https://github.com/YOUR_USERNAME/ACKuifer.git
+git clone https://github.com/dradisdev/ACKuifer.git
 cd ACKuifer
 
 # Create and activate virtual environment
@@ -132,4 +132,4 @@ See Railway dashboard for deployment status and logs.
 
 ## License
 
-Private. All rights reserved. This project is not open source.
+No License stated
