@@ -96,3 +96,5 @@ prototype/*.pdf
 .claude/
 prototype/pfas_monitor/pdfs/
 ~$*
+CLAUDE.md
+BUILD_NOTES.txt
