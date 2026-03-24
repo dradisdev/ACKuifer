@@ -11,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.config import settings
 from app.geo.neighborhood import lookup_neighborhood
+from app.routers.admin import _is_authenticated
 
 logger = logging.getLogger(__name__)
 
@@ -98,11 +99,11 @@ def search(address: str = Form(...)):
 
 @router.get("/map", response_class=HTMLResponse)
 def map_page(request: Request, search_address: str = "", debug: int = 0):
-    is_admin = False  # TODO: wire to admin session auth in Step 8
+    is_admin = _is_authenticated(request)
     return templates.TemplateResponse("map.html", {
         "request": request,
         "mapbox_token": settings.mapbox_public_token,
         "search_address": search_address,
-        "debug_mode": debug == 1,
+        "debug_mode": (debug == 1) and is_admin,
         "is_admin": is_admin,
     })

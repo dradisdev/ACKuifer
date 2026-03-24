@@ -142,7 +142,7 @@ def get_results(
     results = []
 
     # --- Laserfiche / Board of Health results ---
-    lf_query = db.query(PfasResult)
+    lf_query = db.query(PfasResult).filter(PfasResult.hidden == False)
     if neighborhood:
         lf_query = lf_query.filter(PfasResult.neighborhood == neighborhood)
     if status_list:
@@ -178,6 +178,7 @@ def get_results(
 
     # --- MassDEP Source Discovery results ---
     sd_query = db.query(SourceDiscoveryResult).filter(
+        SourceDiscoveryResult.hidden == False,
         SourceDiscoveryResult.latitude.isnot(None),
         SourceDiscoveryResult.longitude.isnot(None),
         SourceDiscoveryResult.geocode_review_needed == False,

@@ -232,6 +232,54 @@ def geocode_resolve(
     return RedirectResponse(url="/admin#geocode-queue", status_code=303)
 
 
+# --- Hide / Unhide results ---
+
+@router.post("/hide-result")
+def hide_result(
+    request: Request,
+    result_id: str = Form(...),
+    source: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    if not _is_authenticated(request):
+        return RedirectResponse(url="/admin/login", status_code=303)
+
+    if source == "laserfiche":
+        record = db.query(PfasResult).filter(PfasResult.id == result_id).first()
+    else:
+        record = db.query(SourceDiscoveryResult).filter(SourceDiscoveryResult.id == int(result_id)).first()
+
+    if record:
+        record.hidden = True
+        db.commit()
+        logger.info("Hidden %s result %s", source, result_id)
+
+    return RedirectResponse(url="/admin#hide-unhide", status_code=303)
+
+
+@router.post("/unhide-result")
+def unhide_result(
+    request: Request,
+    result_id: str = Form(...),
+    source: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    if not _is_authenticated(request):
+        return RedirectResponse(url="/admin/login", status_code=303)
+
+    if source == "laserfiche":
+        record = db.query(PfasResult).filter(PfasResult.id == result_id).first()
+    else:
+        record = db.query(SourceDiscoveryResult).filter(SourceDiscoveryResult.id == int(result_id)).first()
+
+    if record:
+        record.hidden = False
+        db.commit()
+        logger.info("Unhidden %s result %s", source, result_id)
+
+    return RedirectResponse(url="/admin#hide-unhide", status_code=303)
+
+
 # --- Manual scraper triggers ---
 
 @router.post("/run-laserfiche")
