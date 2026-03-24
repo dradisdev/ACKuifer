@@ -57,7 +57,7 @@ def pfas_info(request: Request, db: Session = Depends(get_db)):
         if label and url:
             results_links.append({"label": label, "url": url})
 
-    return templates.TemplateResponse("pfas_info.html", {
+    return templates.TemplateResponse("pfas_info.html", context={
         "request": request,
         "tested_links": tested_links,
         "results_links": results_links,
@@ -72,7 +72,7 @@ def signup_form(
     db: Session = Depends(get_db),
 ):
     neighborhoods = get_all_neighborhoods()
-    return templates.TemplateResponse("signup.html", {
+    return templates.TemplateResponse("signup.html", context={
         "request": request,
         "neighborhoods": neighborhoods,
         "pre_neighborhood": neighborhood,
@@ -95,7 +95,7 @@ def signup_submit(
 
     # Validate email
     if not _validate_email(email):
-        return templates.TemplateResponse("signup.html", {
+        return templates.TemplateResponse("signup.html", context={
             "request": request,
             "neighborhoods": all_neighborhoods,
             "pre_neighborhood": None,
@@ -104,7 +104,7 @@ def signup_submit(
 
     # Validate at least one neighborhood selected
     if not neighborhoods:
-        return templates.TemplateResponse("signup.html", {
+        return templates.TemplateResponse("signup.html", context={
             "request": request,
             "neighborhoods": all_neighborhoods,
             "pre_neighborhood": None,
@@ -130,13 +130,13 @@ def signup_submit(
                 ))
             db.commit()
             _send_confirmation(existing, db)
-            return templates.TemplateResponse("signup_success.html", {
+            return templates.TemplateResponse("signup_success.html", context={
                 "request": request,
                 "email": email,
             })
         else:
             # Already subscribed and active
-            return templates.TemplateResponse("signup.html", {
+            return templates.TemplateResponse("signup.html", context={
                 "request": request,
                 "neighborhoods": all_neighborhoods,
                 "pre_neighborhood": None,
@@ -159,7 +159,7 @@ def signup_submit(
 
     _send_confirmation(user, db)
 
-    return templates.TemplateResponse("signup_success.html", {
+    return templates.TemplateResponse("signup_success.html", context={
         "request": request,
         "email": email,
     })
@@ -179,7 +179,7 @@ def _send_confirmation(user: User, db: Session):
 def confirm_subscription(request: Request, token: str, db: Session = Depends(get_db)):
     user_id = verify_confirm_token(token)
     if not user_id:
-        return templates.TemplateResponse("confirm_success.html", {
+        return templates.TemplateResponse("confirm_success.html", context={
             "request": request,
             "success": False,
             "error": "Invalid or corrupted confirmation link.",
@@ -187,7 +187,7 @@ def confirm_subscription(request: Request, token: str, db: Session = Depends(get
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        return templates.TemplateResponse("confirm_success.html", {
+        return templates.TemplateResponse("confirm_success.html", context={
             "request": request,
             "success": False,
             "error": "Account not found.",
@@ -200,7 +200,7 @@ def confirm_subscription(request: Request, token: str, db: Session = Depends(get
 
     hood_names = [s.neighborhood for s in user.subscriptions]
 
-    return templates.TemplateResponse("confirm_success.html", {
+    return templates.TemplateResponse("confirm_success.html", context={
         "request": request,
         "success": True,
         "neighborhoods": hood_names,
@@ -213,7 +213,7 @@ def confirm_subscription(request: Request, token: str, db: Session = Depends(get
 def unsubscribe(request: Request, token: str, db: Session = Depends(get_db)):
     user_id = verify_unsubscribe_token(token)
     if not user_id:
-        return templates.TemplateResponse("unsubscribe_success.html", {
+        return templates.TemplateResponse("unsubscribe_success.html", context={
             "request": request,
             "success": False,
             "error": "Invalid unsubscribe link.",
@@ -221,7 +221,7 @@ def unsubscribe(request: Request, token: str, db: Session = Depends(get_db)):
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        return templates.TemplateResponse("unsubscribe_success.html", {
+        return templates.TemplateResponse("unsubscribe_success.html", context={
             "request": request,
             "success": False,
             "error": "Account not found.",
@@ -232,7 +232,7 @@ def unsubscribe(request: Request, token: str, db: Session = Depends(get_db)):
     user.last_active_at = datetime.now(timezone.utc)
     db.commit()
 
-    return templates.TemplateResponse("unsubscribe_success.html", {
+    return templates.TemplateResponse("unsubscribe_success.html", context={
         "request": request,
         "success": True,
         "error": None,
@@ -243,7 +243,7 @@ def unsubscribe(request: Request, token: str, db: Session = Depends(get_db)):
 @router.get("/unsubscribe", response_class=HTMLResponse)
 def unsubscribe_query(request: Request, token: str = Query(""), db: Session = Depends(get_db)):
     if not token:
-        return templates.TemplateResponse("unsubscribe_success.html", {
+        return templates.TemplateResponse("unsubscribe_success.html", context={
             "request": request,
             "success": False,
             "error": "Missing unsubscribe token.",
@@ -256,7 +256,7 @@ def unsubscribe_query(request: Request, token: str = Query(""), db: Session = De
 def manage_subscriptions(request: Request, token: str, db: Session = Depends(get_db)):
     user_id = verify_manage_token(token)
     if not user_id:
-        return templates.TemplateResponse("manage.html", {
+        return templates.TemplateResponse("manage.html", context={
             "request": request,
             "expired": True,
             "user": None,
@@ -268,7 +268,7 @@ def manage_subscriptions(request: Request, token: str, db: Session = Depends(get
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        return templates.TemplateResponse("manage.html", {
+        return templates.TemplateResponse("manage.html", context={
             "request": request,
             "expired": False,
             "user": None,
@@ -283,7 +283,7 @@ def manage_subscriptions(request: Request, token: str, db: Session = Depends(get
 
     current = [s.neighborhood for s in user.subscriptions]
 
-    return templates.TemplateResponse("manage.html", {
+    return templates.TemplateResponse("manage.html", context={
         "request": request,
         "expired": False,
         "user": user,
@@ -298,7 +298,7 @@ def manage_subscriptions(request: Request, token: str, db: Session = Depends(get
 @router.get("/manage", response_class=HTMLResponse)
 def manage_query(request: Request, token: str = Query(""), db: Session = Depends(get_db)):
     if not token:
-        return templates.TemplateResponse("manage.html", {
+        return templates.TemplateResponse("manage.html", context={
             "request": request,
             "expired": True,
             "user": None,
@@ -320,7 +320,7 @@ def manage_save(
 ):
     user_id = verify_manage_token(token)
     if not user_id:
-        return templates.TemplateResponse("manage.html", {
+        return templates.TemplateResponse("manage.html", context={
             "request": request,
             "expired": True,
             "user": None,
@@ -352,7 +352,7 @@ def manage_save(
 
     current = [s.neighborhood for s in user.subscriptions]
 
-    return templates.TemplateResponse("manage.html", {
+    return templates.TemplateResponse("manage.html", context={
         "request": request,
         "expired": False,
         "user": user,
