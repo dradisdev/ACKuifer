@@ -55,6 +55,7 @@
     }
     /* Table */
     .table-section { padding: 0.8rem 1rem; }
+    #table-section { display: none; }
     .table-section h2 { font-size: 1rem; margin-bottom: 0.5rem; color: #1a3a5c; }
     #results-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     #results-table th {
@@ -153,7 +154,7 @@
     {% endif %}
   </div>
   <div id="map"></div>
-  <div class="table-section">
+  <div class="table-section" id="table-section">
     <h2>Results (<span id="result-count">0</span>)</h2>
     <div style="overflow-x:auto;">
       <table id="results-table">
@@ -383,6 +384,13 @@ function renderMarkers() {
     tbody.appendChild(tr);
   });
   document.getElementById('result-count').textContent = sorted.length;
+  // Show/hide table section based on active search
+  const tableSection = document.getElementById('table-section');
+  if (_searchLat !== null && _searchLng !== null) {
+    tableSection.style.display = 'block';
+  } else {
+    tableSection.style.display = 'none';
+  }
   // Delegated click listener for table rows (tbody.innerHTML='' clears old listeners)
   tbody.addEventListener('click', function(e) {
     const row = e.target.closest('tr[data-id]');
