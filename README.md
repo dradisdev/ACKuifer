@@ -2,7 +2,7 @@
 
 **Nantucket PFAS Plume Visualization & Alert Service**
 
-ACKuifer monitors public PFAS well test data for Nantucket, Massachusetts, displays results on an interactive map, and sends proactive email and SMS alerts to subscribers by neighborhood. It operates independently of the Town of Nantucket.
+ACKuifer monitors public PFAS well test data for Nantucket, Massachusetts, displays results on an interactive map, and sends proactive email alerts to subscribers by neighborhood. It is not affiliated with the Town of Nantucket or Mass DEP. It's been built to help those who love Nantucket better understand the presence of PFAS on the island.
 
 🌐 [ackuifer.org](https://ackuifer.org)
 
@@ -10,7 +10,7 @@ ACKuifer monitors public PFAS well test data for Nantucket, Massachusetts, displ
 
 ## What It Does
 
-Nantucket has a documented PFAS contamination problem. Test results are public — but they're buried in the Town's Laserfiche portal and MassDEP's EEA database in ways that are inaccessible to ordinary residents. ACKuifer makes this data legible and actionable:
+Nantucket has a extensive public data documenting the presence of PFAS. But test results are buried in the Town's Laserfiche portal and MassDEP's EEA database in ways that are inaccessible to ordinary residents. ACKuifer makes this data legible and actionable:
 
 - **Map** — all results color-coded by detection level, from both data sources
 - **Alerts** — email digest and SMS notifications when new results appear near your neighborhood
@@ -32,7 +32,7 @@ Nantucket has a documented PFAS contamination problem. Test results are public �
 | Geo | Shapely, static GeoJSON (MassGIS + OSM) |
 | Frontend | Jinja2 + Mapbox GL JS |
 | Email | Resend |
-| SMS | Twilio |
+| SMS | Twilio | (not deployed)
 | Deployment | Railway |
 
 ---
@@ -124,8 +124,8 @@ See Railway dashboard for deployment status and logs.
 ## Data Privacy
 
 - Signup addresses are used only for neighborhood resolution and are never stored
-- House numbers are never displayed publicly
-- No analytics, tracking pixels, or advertising
+- House numbers are never displayed
+- No advertising
 - Subscriber data is never shared or sold
 
 ---
