@@ -267,6 +267,42 @@
       </div>
     </div>
 
+    <!-- ===== HIDE / UNHIDE RECORD ===== -->
+    <h2 id="hide-unhide">Hide / Unhide Record</h2>
+    <div class="section">
+      <p style="font-size:0.85rem;color:#718096;margin-bottom:0.8rem;">Find record IDs using <a href="/map?debug=1">/map?debug=1</a> (admin only)</p>
+      <div class="grid-2">
+        <form method="post" action="/admin/hide-result">
+          <div class="form-row">
+            <label for="hide-id">Record ID</label>
+            <input type="text" id="hide-id" name="result_id" placeholder="e.g. 42 or UUID" required>
+          </div>
+          <div class="form-row">
+            <label for="hide-source">Source</label>
+            <select id="hide-source" name="source" style="width:100%;padding:0.4rem 0.6rem;border:1px solid #cbd5e0;border-radius:4px;font-size:0.85rem;">
+              <option value="laserfiche">Board of Health (Laserfiche)</option>
+              <option value="massdep">Source Discovery (MassDEP)</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-danger btn-sm" style="margin-top:0.5rem;">Hide Record</button>
+        </form>
+        <form method="post" action="/admin/unhide-result">
+          <div class="form-row">
+            <label for="unhide-id">Record ID</label>
+            <input type="text" id="unhide-id" name="result_id" placeholder="e.g. 42 or UUID" required>
+          </div>
+          <div class="form-row">
+            <label for="unhide-source">Source</label>
+            <select id="unhide-source" name="source" style="width:100%;padding:0.4rem 0.6rem;border:1px solid #cbd5e0;border-radius:4px;font-size:0.85rem;">
+              <option value="laserfiche">Board of Health (Laserfiche)</option>
+              <option value="massdep">Source Discovery (MassDEP)</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm" style="margin-top:0.5rem;">Unhide Record</button>
+        </form>
+      </div>
+    </div>
+
     <!-- ===== EDITABLE CONTENT ===== -->
     <h2 id="editable-content">Editable Content</h2>
     <div class="section">

@@ -30,6 +30,7 @@ class PfasResult(Base):
     pass_fail = Column(String)  # 'PASS' / 'FAIL' / 'UNKNOWN'
     result_status = Column(String)  # 'NON-DETECT' / 'DETECT' / 'HIGH-DETECT' / 'HAZARD'
     discovered_at = Column(DateTime(timezone=True), server_default=func.now())
+    hidden = Column(Boolean, default=False)
     notified_at = Column(DateTime(timezone=True), nullable=True)
 
 
@@ -56,4 +57,5 @@ class SourceDiscoveryResult(Base):
     medium = Column(Text, nullable=True)  # 'groundwater', 'drinking_water', 'soil'
     clean_address = Column(Text, nullable=True)
     geocode_review_needed = Column(Boolean, default=False)
+    hidden = Column(Boolean, default=False)
     notified_at = Column(DateTime(timezone=True), nullable=True)
