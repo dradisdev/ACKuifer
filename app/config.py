@@ -39,11 +39,11 @@ class Settings(BaseSettings):
 
     # Operator
     operator_email: str = ""
-    deadmans_window_days: int = 10
+    deadmans_window_days: int = 20
 
     # Scraper schedules
-    laserfiche_cron_schedule: str = "0 8 * * *"
-    massdep_cron_schedule: str = "0 9 * * *"
+    laserfiche_cron_schedule: str = "0 8 1,15 * *"
+    massdep_cron_schedule: str = "0 9 1,15 * *"
 
     # Laserfiche portal constants
     laserfiche_base_url: str = "https://portal.laserfiche.com"
