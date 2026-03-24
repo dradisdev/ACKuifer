@@ -1,0 +1,6 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "python -m app.scrapers.run_laserfiche"
+restartPolicyType = "on_failure"
