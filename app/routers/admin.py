@@ -56,7 +56,7 @@ def _require_auth(request: Request):
 def admin_login_form(request: Request, error: str = Query("")):
     if _is_authenticated(request):
         return RedirectResponse(url="/admin", status_code=303)
-    return templates.TemplateResponse("admin_login.html", context={
+    return templates.TemplateResponse("admin_login.html", {
         "request": request,
         "error": error,
     })
@@ -189,7 +189,7 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)):
     configs = db.query(SiteConfig).all()
     config_map = {c.key: c.value for c in configs}
 
-    return templates.TemplateResponse("admin.html", context={
+    return templates.TemplateResponse("admin.html", {
         "request": request,
         "lf_status": lf_status,
         "sd_status": sd_status,

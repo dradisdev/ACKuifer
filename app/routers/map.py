@@ -56,7 +56,7 @@ def _nominatim_search(address: str) -> list:
 
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    return templates.TemplateResponse("index.html", context={"request": request})
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
 @router.post("/search")
@@ -99,7 +99,7 @@ def search(address: str = Form(...)):
 @router.get("/map", response_class=HTMLResponse)
 def map_page(request: Request, search_address: str = "", debug: int = 0):
     is_admin = False  # TODO: wire to admin session auth in Step 8
-    return templates.TemplateResponse("map.html", context={
+    return templates.TemplateResponse("map.html", {
         "request": request,
         "mapbox_token": settings.mapbox_public_token,
         "search_address": search_address,
