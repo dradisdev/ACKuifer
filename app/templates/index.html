@@ -1,104 +1,30 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ACKuifer — Nantucket PFAS Well Test Results</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      color: #1a1a1a; background: #f8f9fa; line-height: 1.6;
-    }
-    .container { max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem; }
-    header { text-align: center; margin-bottom: 2.5rem; }
-    header h1 { font-size: 2.2rem; font-weight: 700; color: #1a3a5c; letter-spacing: -0.02em; }
-    header p.tagline {
-      font-size: 1.1rem; color: #4a5568; margin-top: 0.5rem; font-weight: 400;
-    }
-    .about {
-      font-size: 0.95rem; color: #4a5568; margin-bottom: 2rem;
-      text-align: center; max-width: 600px; margin-left: auto; margin-right: auto;
-    }
-    .map-preview {
-      background: #dde5ed; border-radius: 8px; height: 220px;
-      display: flex; align-items: center; justify-content: center;
-      color: #6b7c93; font-size: 0.9rem; margin-bottom: 2rem;
-    }
-    /* Search form — primary path */
-    .search-section { margin-bottom: 1.5rem; }
-    .search-section h2 {
-      font-size: 1rem; font-weight: 600; color: #1a3a5c; margin-bottom: 0.5rem;
-      text-align: center;
-    }
-    .search-form {
-      display: flex; gap: 0.5rem; max-width: 480px; margin: 0 auto;
-    }
-    .search-form input {
-      flex: 1; padding: 0.7rem 1rem; border: 1px solid #cbd5e0;
-      border-radius: 6px; font-size: 1rem; outline: none;
-    }
-    .search-form input:focus { border-color: #3182ce; box-shadow: 0 0 0 2px rgba(49,130,206,0.2); }
-    .search-form button {
-      padding: 0.7rem 1.4rem; background: #2b6cb0; color: #fff;
-      border: none; border-radius: 6px; font-size: 1rem; font-weight: 600;
-      cursor: pointer; white-space: nowrap;
-    }
-    .search-form button:hover { background: #2c5282; }
-    /* Secondary + tertiary paths */
-    .actions { text-align: center; margin-top: 1.5rem; }
-    .btn-secondary {
-      display: inline-block; padding: 0.6rem 1.4rem;
-      border: 2px solid #2b6cb0; color: #2b6cb0; border-radius: 6px;
-      text-decoration: none; font-weight: 600; font-size: 0.95rem;
-    }
-    .btn-secondary:hover { background: #ebf4ff; }
-    .link-tertiary {
-      display: block; margin-top: 1rem; color: #4a5568;
-      font-size: 0.9rem; text-decoration: underline;
-    }
-    footer {
-      text-align: center; margin-top: 3rem; padding-top: 1.5rem;
-      border-top: 1px solid #e2e8f0; color: #718096; font-size: 0.8rem;
-    }
-    @media (max-width: 480px) {
-      .search-form { flex-direction: column; }
-      header h1 { font-size: 1.7rem; }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACKuifer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #fff;
+            color: #222;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
+            padding: 1rem;
+        }
+        h1 { font-size: 2.5rem; margin-bottom: 0.75rem; letter-spacing: 0.02em; }
+        p { font-size: 1.125rem; color: #555; }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <h1>ACKuifer</h1>
-      <p class="tagline">Nantucket PFAS Well Test Results &mdash; mapped and monitored</p>
-    </header>
-
-    <p class="about">
-      ACKuifer monitors two public data sources for new PFAS well test results on
-      Nantucket &mdash; the Town Board of Health and the MassDEP Source Discovery
-      investigation &mdash; and displays all results on an interactive map.
-      Sign up to get notified when new results appear near your neighborhood.
-    </p>
-
-    <div class="map-preview">Map preview image</div>
-
-    <section class="search-section">
-      <h2>Check results near your address</h2>
-      <form class="search-form" action="/search" method="post">
-        <input type="text" name="address" placeholder="Enter a Nantucket street address" required>
-        <button type="submit">Search</button>
-      </form>
-    </section>
-
-    <div class="actions">
-      <a href="/signup" class="btn-secondary">Sign up for alerts</a>
-      <a href="/map" class="link-tertiary">View the full island map</a>
+    <div>
+        <h1>ACKuifer</h1>
+        <p>Coming soon.</p>
     </div>
-
-    <footer>
-      ACKuifer is independently operated and is not affiliated with the Town of Nantucket.
-    </footer>
-  </div>
 </body>
 </html>
