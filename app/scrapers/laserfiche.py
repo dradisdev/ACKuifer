@@ -318,21 +318,34 @@ def _parse_report(page: Page, doc_id: str) -> Optional[dict]:
         results["pass_fail"] = "UNKNOWN"
 
     # Address — cleaned of UI chrome
-    # Primary: "Collection Address: 24 Sesachacha Road, Nantucket" (trailing codes vary)
-    addr_match = re.search(
-        r"Collection Address[:\s]+([^,]+,\s*Nantucket)[^\n]*", content
-    )
-    if addr_match:
-        addr = addr_match.group(1).strip()
-        addr = re.sub(r",?\s*$", "", addr)
-        results["sample_address"] = addr
-
-    if not results["sample_address"]:
+    # Check for MassDEP Drinking Water Program form format first
+    if re.search(r"Drinking Water Program|PWS INFORMATION", content, re.IGNORECASE):
+        # DW Program form: address is a standalone street line near MassDEP LOC fields
+        # Look for a street address pattern (number + street name) near "Nantucket"
         addr_match = re.search(
-            r"(\d+\s+[A-Za-z][^,]+,\s*Nantucket)\s*[A-Z]{2}\d{2}/", content
+            r"(\d+\s+[A-Za-z][^\n,]{3,40}(?:Rd|Road|St|Street|Ave|Avenue|"
+            r"Ln|Lane|Dr|Drive|Way|Blvd|Ct|Court|Pl|Place)\.?)"
+            r"(?:\s*\n[^\n]*){0,5}Nantucket",
+            content, re.IGNORECASE
         )
         if addr_match:
-            results["sample_address"] = addr_match.group(1).strip()
+            results["sample_address"] = addr_match.group(1).strip().rstrip(".")
+    else:
+        # Standard Barnstable County / Pace lab format
+        # Primary: "Collection Address: 24 Sesachacha Road, Nantucket"
+        addr_match = re.search(
+            r"Collection Address[:\s]+([^,]+,\s*Nantucket)[^\n]*", content
+        )
+        if addr_match:
+            addr = addr_match.group(1).strip()
+            addr = re.sub(r",?\s*$", "", addr)
+            results["sample_address"] = addr
+        if not results["sample_address"]:
+            addr_match = re.search(
+                r"(\d+\s+[A-Za-z][^,]+,\s*Nantucket)\s*[A-Z]{2}\d{2}/", content
+            )
+            if addr_match:
+                results["sample_address"] = addr_match.group(1).strip()
 
     # Sample date
     date_match = re.search(r"Sampled[:\s]*([\d/]+)", content)
