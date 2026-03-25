@@ -320,17 +320,17 @@ def _parse_report(page: Page, doc_id: str) -> Optional[dict]:
     # Address — cleaned of UI chrome
     # Check for MassDEP Drinking Water Program form format first
     if re.search(r"Drinking Water Program|PWS INFORMATION", content, re.IGNORECASE):
-        # DW Program form: find the last street address before "Nantucket" appears
-        # Use findall to get all matches and take the last one (closest to Nantucket)
-        addr_matches = re.findall(
+        # DW Program form: address appears as "[number] [street], Nantucket"
+        # immediately before "Customer" or a date pattern
+        addr_match = re.search(
             r"(\d+[A-Za-z]?\s+[A-Za-z][A-Za-z\s]{2,30}"
             r"(?:Rd|Road|St|Street|Ave|Avenue|Ln|Lane|Dr|Drive|"
-            r"Way|Blvd|Ct|Court|Pl|Place)\.?)",
-            content.split("Nantucket")[0],
-            re.IGNORECASE
+            r"Way|Blvd|Ct|Court|Pl|Place)\.?)"
+            r",?\s*Nantucket",
+            content, re.IGNORECASE
         )
-        if addr_matches:
-            results["sample_address"] = addr_matches[-1].strip().rstrip(".")
+        if addr_match:
+            results["sample_address"] = addr_match.group(1).strip().rstrip(".")
     else:
         # Standard Barnstable County / Pace lab format
         # Primary: "Collection Address: 24 Sesachacha Road, Nantucket"
