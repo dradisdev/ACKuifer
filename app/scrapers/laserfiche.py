@@ -320,13 +320,14 @@ def _parse_report(page: Page, doc_id: str) -> Optional[dict]:
     # Address — cleaned of UI chrome
     # Check for MassDEP Drinking Water Program form format first
     if re.search(r"Drinking Water Program|PWS INFORMATION", content, re.IGNORECASE):
-        # DW Program form: address appears as "[number] [street], Nantucket"
-        # immediately before "Customer" or a date pattern
+        # DW Program form: two known address patterns:
+        # 1. "58 Squam Road DP 07/15/2025" — address + 2-letter code + date
+        # 2. "5 Anna Drive, Nantucket Customer 03/11/2025" — address + Nantucket
         addr_match = re.search(
             r"(\d+[A-Za-z]?\s+[A-Za-z][A-Za-z\s]{2,30}"
             r"(?:Rd|Road|St|Street|Ave|Avenue|Ln|Lane|Dr|Drive|"
             r"Way|Blvd|Ct|Court|Pl|Place)\.?)"
-            r",?\s*Nantucket",
+            r"(?:,?\s*Nantucket|\s+[A-Z]{2}\s+\d{2}/\d{2}/\d{4})",
             content, re.IGNORECASE
         )
         if addr_match:
