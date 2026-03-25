@@ -386,7 +386,8 @@ function renderMarkers() {
   document.getElementById('result-count').textContent = sorted.length;
   // Show/hide table section based on active search
   const tableSection = document.getElementById('table-section');
-  if (_searchLat !== null && _searchLng !== null) {
+  const isAdmin = {{ 'true' if is_admin else 'false' }};
+  if (isAdmin || (_searchLat !== null && _searchLng !== null)) {
     tableSection.style.display = 'block';
   } else {
     tableSection.style.display = 'none';
