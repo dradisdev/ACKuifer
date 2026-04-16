@@ -20,6 +20,7 @@ import sys
 
 import psycopg2
 import psycopg2.extras
+from dotenv import load_dotenv
 
 
 def main():
@@ -30,6 +31,8 @@ def main():
         help="Actually perform the deletes (default is dry-run).",
     )
     args = parser.parse_args()
+
+    load_dotenv()
 
     db_url = os.environ.get("DATABASE_URL")
     if not db_url:
