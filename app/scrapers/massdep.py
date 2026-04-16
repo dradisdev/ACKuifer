@@ -505,6 +505,20 @@ def _parse_lab_cert_block(block: str, locations: dict):
     if re.search(r"Solids,\s*Total|QC\s+Batch|Sample\s+Receipt|Standard\s+Reference", first_500, re.I):
         return
 
+    # Skip QC analysis pages — Lab Duplicate, Matrix Spike, Lab
+    # Control Sample, and Method Blank pages contain compound values
+    # that are not real sample results. _parse_pace_lab_cert already
+    # does this check; _parse_lab_cert_block needs it too because
+    # format detection sometimes routes Pace-style PDFs here when
+    # the "Lab Sample Collection" header isn't matched.
+    if any(qc_header in block for qc_header in (
+        "Lab Duplicate Analysis",
+        "Matrix Spike Analysis",
+        "Lab Control Sample Analysis",
+        "Method Blank Analysis",
+    )):
+        return
+
     # Skip truncated Client IDs
     if re.match(r"^\d+$", client_id):
         return
@@ -622,13 +636,21 @@ def _parse_lab_cert_block(block: str, locations: dict):
     if not compounds and pfas6 is None:
         return
 
-    # Merge into locations dict
+    # Merge into locations dict — merge-first (fill nulls only).
+    # Do not overwrite existing non-null compound values; a later
+    # block in the same PDF is usually a QC, re-analysis with
+    # unrelated dilution, or partial re-extraction, not a more
+    # accurate sample reading.
     loc_key = (client_id, medium)
     if loc_key in locations:
         existing = locations[loc_key]
-        if pfas6 is not None and (existing.get("pfas6") or 0) < pfas6:
+        # Fill compound values only where existing is missing
+        for name, val in compounds.items():
+            if val is not None and existing["compounds"].get(name) is None:
+                existing["compounds"][name] = val
+        # Fill pfas6 only if existing is missing
+        if pfas6 is not None and existing.get("pfas6") is None:
             existing["pfas6"] = pfas6
-            existing["compounds"] = {**existing["compounds"], **compounds}
         if sample_date and not existing.get("sample_date"):
             existing["sample_date"] = sample_date
     else:
@@ -694,14 +716,25 @@ def _dedup_locations(locations: list[dict]) -> list[dict]:
             if len(subgroup) == 1:
                 merged.append(subgroup[0])
                 continue
-            best = max(subgroup, key=lambda l: (len(l["well_id"]), l.get("pfas6") or 0))
-            all_compounds = {}
+            # Pick the record with the longest well_id as the anchor
+            # (most specific identification). Merge compounds fill-
+            # nulls-only; do not overwrite existing non-null values.
+            best = max(subgroup, key=lambda l: len(l["well_id"]))
+            merged_compounds = dict(best.get("compounds", {}))
             for loc in subgroup:
-                all_compounds.update(loc.get("compounds", {}))
-            best["compounds"] = all_compounds
-            pfas6_vals = [l.get("pfas6") for l in subgroup if l.get("pfas6") is not None]
-            if pfas6_vals:
-                best["pfas6"] = max(pfas6_vals)
+                if loc is best:
+                    continue
+                for name, val in loc.get("compounds", {}).items():
+                    if val is not None and merged_compounds.get(name) is None:
+                        merged_compounds[name] = val
+            best["compounds"] = merged_compounds
+            # If the anchor has no pfas6, fill from the first
+            # non-null pfas6 in the subgroup.
+            if best.get("pfas6") is None:
+                for loc in subgroup:
+                    if loc.get("pfas6") is not None:
+                        best["pfas6"] = loc["pfas6"]
+                        break
             merged.append(best)
 
     return merged
@@ -1562,8 +1595,9 @@ def _save_location(loc: dict, doc_url: str, stats: dict):
     """Geocode and save a single sample location to DB.
 
     Deduplicates by (sample_location, sample_date, medium) composite key.
-    When a match exists, merges compound values (max non-null per compound),
-    recalculates pfas6_sum and result_status.
+    When a match exists, merges compound values fill-nulls-only —
+    existing non-null values are never overwritten. Recalculates
+    pfas6_sum and result_status after merging.
     """
     geo = _geocode_location(loc)
 
@@ -1605,14 +1639,17 @@ def _save_location(loc: dict, doc_url: str, stats: dict):
         ).first()
 
         if existing:
-            # Merge compounds: keep max non-null for each
+            # Merge compounds: fill nulls only. Never overwrite an
+            # existing non-null value — a second PDF reporting the
+            # same sample tends to either repeat the same result
+            # or report an unrelated run (QC, re-analysis). The
+            # first-seen value is most likely the canonical one.
             merged_any = False
             for field, new_val in compound_fields.items():
                 old_val = getattr(existing, field)
-                if new_val is not None:
-                    if old_val is None or new_val > old_val:
-                        setattr(existing, field, new_val)
-                        merged_any = True
+                if new_val is not None and old_val is None:
+                    setattr(existing, field, new_val)
+                    merged_any = True
 
             if merged_any:
                 # Recalculate pfas6_sum from merged compounds
@@ -1626,7 +1663,7 @@ def _save_location(loc: dict, doc_url: str, stats: dict):
                 existing.result_status = classify_result_status(new_pfas6)
                 db.commit()
                 logger.info(
-                    "    Merged: %s PFAS6=%.1f status=%s (cross-PDF merge)",
+                    "    Merged: %s PFAS6=%.1f status=%s (cross-PDF fill)",
                     well_id, new_pfas6, existing.result_status,
                 )
             else:
