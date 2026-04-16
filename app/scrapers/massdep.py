@@ -136,7 +136,9 @@ PFAS6_LINE_PATTERN = re.compile(
 INDIVIDUAL_COMPOUND_PATTERN = re.compile(
     r"(PFOS|PFOA|PFNA|PFHxS|PFHpA|PFHpS|PFDA|PFHxA|PFBS|PFBA|PFPeA|"
     r"PFUnDA|PFDoDA|PFTrDA|PFTeDA|HFPO-DA|NEtFOSAA|NMeFOSAA)"
-    r"\s+([<>]?ND|[<>]?\s*\d+\.?\d*(?:E[+-]?\d+)?)\s*(ng/L|ug/kg|µg/kg)?",
+    r"\s+([<>]?ND|[<>]?\s*\d+\.?\d*(?:E[+-]?\d+)?)"
+    r"\s*([EeJj])?"
+    r"\s*(ng/L|ug/kg|µg/kg)?",
     re.I,
 )
 
@@ -150,8 +152,8 @@ GPS_PATTERN = re.compile(
 PACE_COMPOUND_LINE_RE = re.compile(
     r'^(Perfluoro.+?\([A-Za-z0-9\-]+\))'
     r'\s+(ND|\d[\d\.]*(?:E[+-]?\d+)?)'
-    r'\s*(?:[A-Z]\s+)?'
-    r'(ng/l|ug/kg)',
+    r'\s*([EeJj])?'
+    r'\s*(ng/l|ug/kg)',
     re.I,
 )
 
@@ -559,6 +561,12 @@ def _parse_lab_cert_block(block: str, locations: dict):
 
     # Strategy A: short-form "PFOS  5.2  ng/L"
     for cm in INDIVIDUAL_COMPOUND_PATTERN.finditer(block):
+        qualifier = (cm.group(3) or "").upper()
+        if qualifier == "E":
+            # "E" = estimated, above calibration range.
+            # The lab re-runs these at higher dilution and reports
+            # a trustworthy value later in the PDF — skip this one.
+            continue
         name = _normalise_compound_name(cm.group(1))
         val = _parse_number(cm.group(2))
         if name not in compounds:
@@ -570,10 +578,13 @@ def _parse_lab_cert_block(block: str, locations: dict):
             r"\(("
             r"PFOS|PFOA|PFNA|PFHxS|PFHpA|PFHpS|PFDA|PFHxA|PFBS|PFBA|PFPeA|"
             r"PFUnDA|PFDoDA|PFTrDA|PFTeDA|HFPO-DA|NEtFOSAA|NMeFOSAA"
-            r")\)\s+([<>]?ND|\d+\.?\d*)\s*([Jj])?\s*(ng/l|ug/kg|µg/kg)?",
+            r")\)\s+([<>]?ND|\d+\.?\d*)\s*([EeJj])?\s*(ng/l|ug/kg|µg/kg)?",
             line, re.I,
         )
         if pm:
+            qualifier = (pm.group(3) or "").upper()
+            if qualifier == "E":
+                continue
             name = _normalise_compound_name(pm.group(1))
             val = _parse_number(pm.group(2))
             if name not in compounds:
@@ -584,10 +595,15 @@ def _parse_lab_cert_block(block: str, locations: dict):
         lm = re.match(
             r"\s*(PFOS|PFOA|PFNA|PFHxS|PFHpA|PFHpS|PFDA|PFHxA|PFBS|PFBA|PFPeA|"
             r"PFUnDA|PFDoDA|PFTrDA|PFTeDA|HFPO-DA|NEtFOSAA|NMeFOSAA)"
-            r"\s+([<>]?ND|\d+\.?\d*(?:E[+-]?\d+)?)\s*(ng/L|ug/kg|µg/kg)?",
+            r"\s+([<>]?ND|\d+\.?\d*(?:E[+-]?\d+)?)"
+            r"\s*([EeJj])?"
+            r"\s*(ng/L|ug/kg|µg/kg)?",
             line, re.I,
         )
         if lm:
+            qualifier = (lm.group(3) or "").upper()
+            if qualifier == "E":
+                continue
             name = _normalise_compound_name(lm.group(1))
             val = _parse_number(lm.group(2))
             if name not in compounds:
@@ -765,6 +781,11 @@ def _parse_pace_lab_cert(text: str, pages_text: list) -> list[dict]:
             for line in page_text.split('\n'):
                 cm = PACE_COMPOUND_LINE_RE.match(line)
                 if not cm:
+                    continue
+                qualifier = (cm.group(3) or "").upper()
+                if qualifier == "E":
+                    # Above calibration range — lab re-runs at
+                    # higher dilution; trust the re-run, not this.
                     continue
                 full_name = cm.group(1)
                 val = _parse_number(cm.group(2))
