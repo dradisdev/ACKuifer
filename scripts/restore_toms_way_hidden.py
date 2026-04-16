@@ -143,14 +143,12 @@ def main():
                     r["result_status"],
                 ))
 
-            # Bump the id sequence past our highest id, in case it's now behind
+            # Reset the id sequence to the current max, so future
+            # nextval() calls don't collide with our re-inserted ids.
             cur.execute("""
                 SELECT setval(
                     pg_get_serial_sequence('source_discovery_results', 'id'),
-                    GREATEST(
-                        (SELECT MAX(id) FROM source_discovery_results),
-                        currval(pg_get_serial_sequence('source_discovery_results', 'id'))
-                    )
+                    (SELECT MAX(id) FROM source_discovery_results)
                 )
             """)
 
