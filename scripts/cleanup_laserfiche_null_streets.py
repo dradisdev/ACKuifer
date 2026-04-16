@@ -91,14 +91,21 @@ def main():
                   f"{'neighborhood':<20}  {'date':<12}  {'pfas6':>7}  status")
             print("-" * 90)
             for row in cur.fetchall():
+                map_str = str(row["map_number"]) if row["map_number"] else "—"
+                parcel_str = str(row["parcel_number"]) if row["parcel_number"] else "—"
+                hood_str = row["neighborhood"] or "—"
+                date_str = str(row["sample_date"]) if row["sample_date"] else "—"
+                pfas6_val = row["pfas6_sum"]
+                pfas6_str = f"{float(pfas6_val):.1f}" if pfas6_val is not None else "—"
+                status_str = row["result_status"] or "—"
                 print(
                     f"{row['laserfiche_doc_id']:>8}  "
-                    f"{(row['map_number'] or '—'):>4}  "
-                    f"{(row['parcel_number'] or '—'):>8}  "
-                    f"{(row['neighborhood'] or '—'):<20}  "
-                    f"{(str(row['sample_date']) if row['sample_date'] else '—'):<12}  "
-                    f"{(f'{float(row[\"pfas6_sum\"]):.1f}' if row['pfas6_sum'] is not None else '—'):>7}  "
-                    f"{row['result_status'] or '—'}"
+                    f"{map_str:>4}  "
+                    f"{parcel_str:>8}  "
+                    f"{hood_str:<20}  "
+                    f"{date_str:<12}  "
+                    f"{pfas6_str:>7}  "
+                    f"{status_str}"
                 )
 
             # 3. Dry-run or commit
