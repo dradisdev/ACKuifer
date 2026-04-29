@@ -97,3 +97,6 @@ prototype/*.pdf
 prototype/pfas_monitor/pdfs/
 ~$*
 BUILD_NOTES.txt
+
+# Diagnostic trace artifacts (parse_pdf_dry.py --trace)
+*trace*.txt
