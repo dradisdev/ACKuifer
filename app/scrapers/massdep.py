@@ -507,9 +507,16 @@ def _parse_lab_cert_block(block: str, locations: dict):
     if re.match(r"^\d+$", client_id):
         return
     if re.match(r"^\d+\s+[A-Za-z]", client_id):
-        road_suffixes = (r"\b(WAY|ROAD|RD|STREET|ST|LANE|LN|DRIVE|DR|AVE|AVENUE|"
+        # The trailing (?:_[A-Z0-9]+)* allows underscore-delimited sample
+        # suffixes (WAY_2, WAY_M, WAY_F_3, RD_INF, ST_EFF, etc.) to count
+        # as a valid road-suffix match. Without it, \bWAY\b silently fails
+        # on these forms because _ is a word character in Python regex
+        # and \b doesn't fire between Y and _. The well_id keeps its
+        # suffix; downstream _clean_dw_sample_location strips it for
+        # geocoding.
+        road_suffixes = (r"\b(?:WAY|ROAD|RD|STREET|ST|LANE|LN|DRIVE|DR|AVE|AVENUE|"
                          r"CIRCLE|CIR|COURT|CT|PLACE|PL|PATH|TRAIL|TRL|BLVD|"
-                         r"BOULEVARD|TERRACE|TER|PIKE|HWY|HIGHWAY)\b")
+                         r"BOULEVARD|TERRACE|TER|PIKE|HWY|HIGHWAY)(?:_[A-Z0-9]+)*\b")
         if not re.search(road_suffixes, client_id, re.I):
             return
 
