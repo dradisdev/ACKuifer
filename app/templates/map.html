@@ -77,6 +77,16 @@
       font-size: 0.72rem; font-weight: 600; color: #fff; background: #718096;
       margin-left: 4px; vertical-align: middle;
     }
+    .trace-badge {
+      display: inline-block; padding: 0.15rem 0.4rem; border-radius: 3px;
+      font-size: 0.72rem; font-weight: 600; color: #744210; background: #FEFCBF;
+      border: 1px solid #F6E05E; margin-left: 4px; vertical-align: middle;
+      cursor: help;
+    }
+    .popup-trace-note {
+      font-size: 0.75rem; color: #744210; margin-top: 4px;
+      padding-top: 4px; border-top: 1px dashed #E2E8F0;
+    }
     .retest-group-a { background: #edf2f7; }
     .retest-group-b { background: #e2ecf5; }
     #results-table tbody tr[data-id]:hover { background: #ebf4ff !important; }
@@ -297,6 +307,13 @@ function formatDate(d) {
 function buildPopupHtml(r) {
   const valueStr = formatValue(r);
   const aboveMCL = r.pfas6_sum !== null && r.pfas6_sum > MCL;
+  const isTrace = r.j_qualifier_present === true;
+  const traceBadge = isTrace
+    ? ' <span class="trace-badge" title="Trace detection: one or more values were measured below the lab&apos;s reporting limit and are estimated">Trace</span>'
+    : '';
+  const traceNote = isTrace
+    ? '<div class="popup-trace-note">Below lab reporting limit (estimated value)</div>'
+    : '';
   const debugLine = isDebugActive()
     ? `<div class="popup-debug">id: ${r.id} &nbsp;|&nbsp; src: ${r.source}</div>`
     : '';
@@ -304,10 +321,11 @@ function buildPopupHtml(r) {
     <div>
       <strong>${r.street_name || 'Unknown location'}</strong><br>
       <span class="popup-value">${valueStr}</span>
-      ${aboveMCL ? ' <span style="color:#e53e3e;font-weight:700;">Above MCL</span>' : ''}<br>
+      ${aboveMCL ? ' <span style="color:#e53e3e;font-weight:700;">Above MCL</span>' : ''}${traceBadge}<br>
       ${formatDate(r.sample_date)}<br>
       <span class="popup-source">${SOURCE_LABELS[r.source] || r.source}</span><br>
       ${r.source_doc_url ? `<a href="${r.source_doc_url}" target="_blank" rel="noopener">View report</a>` : ''}
+      ${traceNote}
       ${debugLine}
     </div>
   `;
@@ -377,6 +395,7 @@ function renderMarkers() {
       <td>
         <span class="status-badge status-${r.result_status}">${r.result_status}</span>
         ${r.is_retest ? '<span class="retest-badge">Retest</span>' : ''}
+        ${r.j_qualifier_present ? '<span class="trace-badge" title="Trace detection: estimated below lab reporting limit">Trace</span>' : ''}
       </td>
       <td>${formatDate(r.sample_date)}</td>
       <td>${r.source_doc_url ? `<a href="${r.source_doc_url}" target="_blank">Report</a>` : '—'}</td>
@@ -386,8 +405,7 @@ function renderMarkers() {
   document.getElementById('result-count').textContent = sorted.length;
   // Show/hide table section based on active search
   const tableSection = document.getElementById('table-section');
-  const isAdmin = {{ 'true' if is_admin else 'false' }};
-  if (isAdmin || (_searchLat !== null && _searchLng !== null)) {
+  if (_searchLat !== null && _searchLng !== null) {
     tableSection.style.display = 'block';
   } else {
     tableSection.style.display = 'none';

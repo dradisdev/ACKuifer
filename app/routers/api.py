@@ -172,6 +172,7 @@ def get_results(
             "result_status": r.result_status,
             "sample_date": r.sample_date.isoformat() if r.sample_date else None,
             "source_doc_url": doc_url,
+            "j_qualifier_present": bool(r.j_qualifier_present),
             "is_retest": False,
             "retest_group_id": None,
         })
@@ -205,6 +206,7 @@ def get_results(
             "result_status": r.result_status,
             "sample_date": r.sample_date.isoformat() if r.sample_date else None,
             "source_doc_url": base_url,
+            "j_qualifier_present": False,  # MassDEP records don't carry this flag
             "is_retest": False,
             "retest_group_id": None,
         })

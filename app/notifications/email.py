@@ -210,6 +210,11 @@ def _build_digest_html(neighborhood: str, rows: list, unsubscribe_url: str, mana
         bold = "font-weight:700;" if highlight else ""
         value_color = "color:#E53E3E;" if r["above_mcl"] else ""
         mcl_badge = ' <span style="color:#E53E3E;font-weight:700;font-size:12px;">Above MCL</span>' if r["above_mcl"] else ""
+        trace_badge = (
+            ' <span style="color:#744210;background:#FEFCBF;border:1px solid #F6E05E;'
+            'padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600;">Trace</span>'
+            if r["j_qualified"] else ""
+        )
         doc_link = f'<a href="{r["source_doc_url"]}" style="color:#2B6CB0;text-decoration:none;">View report</a>' if r["source_doc_url"] else "\u2014"
 
         # Retest indicator
@@ -232,7 +237,7 @@ def _build_digest_html(neighborhood: str, rows: list, unsubscribe_url: str, mana
 
         return f"""<tr style="background:{bg};">
   <td style="padding:10px 12px;border-bottom:1px solid #EDF2F7;{bold}">{street_display}</td>
-  <td style="padding:10px 12px;border-bottom:1px solid #EDF2F7;{bold}{value_color}">{r["value_display"]}{mcl_badge}</td>
+  <td style="padding:10px 12px;border-bottom:1px solid #EDF2F7;{bold}{value_color}">{r["value_display"]}{mcl_badge}{trace_badge}</td>
   <td style="padding:10px 12px;border-bottom:1px solid #EDF2F7;">{r["sample_date"]}</td>
   <td style="padding:10px 12px;border-bottom:1px solid #EDF2F7;">{r["source_label"]}</td>
   <td style="padding:10px 12px;border-bottom:1px solid #EDF2F7;">{doc_link}</td>
@@ -282,8 +287,10 @@ def _build_digest_html(neighborhood: str, rows: list, unsubscribe_url: str, mana
     j_footnote = ""
     if any_j_qualified:
         j_footnote = """
-<p style="font-size:12px;color:#718096;margin-top:16px;font-style:italic;">
-  * One or more values are J-qualified (estimated). See source report for details.
+<p style="font-size:12px;color:#744210;margin-top:16px;font-style:italic;">
+  Results marked <span style="color:#744210;background:#FEFCBF;border:1px solid #F6E05E;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600;font-style:normal;">Trace</span>
+  contain one or more values measured below the lab's reporting limit. These are estimated
+  detections; the lab classifies them as non-detect for regulatory reporting. See source report for full compound breakdown.
 </p>"""
 
     return f"""<!DOCTYPE html>

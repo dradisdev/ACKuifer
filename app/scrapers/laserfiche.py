@@ -20,7 +20,7 @@ from typing import Optional
 
 from playwright.sync_api import sync_playwright, Page
 
-from app.config import settings, classify_result_status, FALLBACK_NEIGHBORHOOD
+from app.config import settings, classify_result_status, FALLBACK_NEIGHBORHOOD, MCL
 from app.database import SessionLocal
 from app.models.results import PfasResult
 from app.models.scraper import SeenDocument, ScrapeRun
@@ -147,8 +147,50 @@ def _extract_all_links_with_scroll(page: Page, max_scrolls: int = 50) -> list[di
 # Report parsing (from prototype, with address fix)
 # =============================================================================
 
-def _extract_compound_value(content: str, short_name: str, long_name: str) -> Optional[float]:
-    """Extract a compound value from report content. Returns None if not found, 0 if ND."""
+def _mcl_regex_pattern() -> str:
+    """Build a regex fragment matching the MCL value as it appears in MassDEP
+    DW Program forms. Handles integer MCL displayed without decimal ("20")
+    and a possible future decimal form ("20.0", "18.5", etc.) so this won't
+    silently break if the MA PFAS6 MCL is amended.
+    """
+    if MCL == int(MCL):
+        # Integer MCL — accept either "20" or "20.0" form depending on lab
+        return rf"{int(MCL)}(?:\.0+)?"
+    # Decimal MCL — escape the dot for regex
+    return re.escape(f"{MCL:g}")
+
+
+def _extract_compound_value(
+    content: str,
+    short_name: str,
+    long_name: str,
+    is_dw_program: bool = False,
+) -> Optional[float]:
+    """Extract a compound value from report content. Returns None if not found, 0 if ND.
+
+    When is_dw_program=True, uses a single targeted pattern that handles the
+    MassDEP DW Program form's "MDL MRL VALUE" row layout where the MRL ("2.00")
+    and VALUE are concatenated without a separator. The standard 1a/1b/1c/2
+    patterns mis-fire on this layout (Pattern 2 captures only the trailing
+    digit of the concatenated number due to regex backtracking) so we skip
+    them entirely on DW Program forms.
+    """
+    if is_dw_program:
+        # DW Program row format:
+        #   "<CAS> (<SHORT>) <LONG NAME> <MDL> <MRL><VALUE>"
+        # MRL is the MassDEP-mandated 2.00 ng/L Minimum Reporting Limit for
+        # all PFAS6 compounds and is concatenated to VALUE in the rendered
+        # plain-text. We anchor on (SHORT), then on the literal MRL, and
+        # capture the trailing VALUE.
+        m = re.search(
+            rf"\({re.escape(short_name)}\)[^\n]+?\s+\d+\.\d+\s+2\.00(ND|\d+(?:\.\d+)?)",
+            content,
+            re.IGNORECASE,
+        )
+        if m:
+            return 0.0 if m.group(1) == "ND" else float(m.group(1))
+        return None
+
     # Pattern 1a: value ng/L ... LONG_NAME-SHORT_NAME
     m = re.search(
         rf"([\d.]+|ND)\s+ng/L\s+[\d.]+\s+[\d.]+\s+\d+{re.escape(long_name[:10])}[^\n]*-?{re.escape(short_name)}",
@@ -212,7 +254,16 @@ def _extract_street_name(address: str) -> Optional[str]:
 
 
 def _parse_report(page: Page, doc_id: str) -> Optional[dict]:
-    """Open a Laserfiche document in plain-text mode and parse PFAS data."""
+    """Open a Laserfiche document in plain-text mode and parse PFAS data.
+
+    Returns None if the plain-text view could not be opened. Otherwise
+    returns the dict produced by _parse_report_text.
+
+    This function does only the Playwright-driven work of fetching the
+    plain-text content from Laserfiche. All parsing logic lives in
+    _parse_report_text, which is a pure function over a string and
+    therefore testable without a browser.
+    """
     page.goto(_doc_url(doc_id))
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(2000)
@@ -266,7 +317,20 @@ def _parse_report(page: Page, doc_id: str) -> Optional[dict]:
             break
 
     content = _strip_ui_chrome(all_content)
+    return _parse_report_text(content)
 
+
+def _parse_report_text(content: str) -> dict:
+    """Parse already-extracted plain-text content from a Laserfiche PFAS report.
+
+    Pure function — no I/O, no browser. Takes the post-UI-chrome-stripped
+    plain-text content and returns the parsed result dict that
+    _process_document expects.
+
+    Splitting this out from _parse_report enables dry-run testing of the
+    parser against saved text dumps (see scripts/parse_laserfiche_text.py)
+    without spinning up Playwright or hitting Laserfiche.
+    """
     results = {
         "pfas6": None,
         "pass_fail": None,
@@ -276,35 +340,81 @@ def _parse_report(page: Page, doc_id: str) -> Optional[dict]:
         "j_qualifier_present": False,
     }
 
+    # Detect form type up-front. The MassDEP DW Program form has a different
+    # row layout (CAS-anchored, MRL concatenated to value) than the standard
+    # Barnstable lab format, so PFAS6 and compound extraction both need
+    # form-aware paths.
+    is_dw_program = bool(
+        re.search(r"Drinking Water Program|PWS INFORMATION", content, re.IGNORECASE)
+    )
+
     # Extract PFAS6 value
-    pfas6_match = re.search(r"([\d.]+|ND)\s+ng/L[^\n]*PFAS6", content, re.IGNORECASE)
-    if pfas6_match:
-        val = pfas6_match.group(1)
-        results["pfas6"] = 0.0 if val == "ND" else float(val)
-    else:
-        pfas6_match = re.search(r"PFAS6[^=]+=\d+(ND|[\d.]+)", content, re.IGNORECASE)
+    if is_dw_program:
+        # DW Program form: PFAS6 line is "...) =<MCL><VALUE>" — MCL and
+        # VALUE are concatenated without a separator (e.g. "=2043.0" means
+        # MCL 20 + value 43.0). Anchor on the literal MCL to skip past it
+        # and capture VALUE cleanly. The previous fallback regex
+        # `PFAS6[^=]+=\d+(ND|[\d.]+)` greedily consumed both numbers and
+        # captured only ".0" — see Bug #4 in BUILD_NOTES.
+        mcl_pattern = _mcl_regex_pattern()
+        pfas6_match = re.search(
+            rf"PFAS6[^=]+={mcl_pattern}(ND|\d+(?:\.\d+)?)",
+            content,
+            re.IGNORECASE | re.DOTALL,
+        )
         if pfas6_match:
             val = pfas6_match.group(1)
             results["pfas6"] = 0.0 if val == "ND" else float(val)
+    else:
+        # Standard Barnstable lab format: "<VALUE> ng/L ... PFAS6"
+        pfas6_match = re.search(
+            r"([\d.]+|ND)\s+ng/L[^\n]*PFAS6", content, re.IGNORECASE
+        )
+        if pfas6_match:
+            val = pfas6_match.group(1)
+            results["pfas6"] = 0.0 if val == "ND" else float(val)
+        else:
+            # Older fallback for "PFAS6 ... = <MCL><VALUE>" forms that don't
+            # match is_dw_program detection but use the same "=" syntax.
+            pfas6_match = re.search(
+                r"PFAS6[^=]+=\d+(ND|[\d.]+)", content, re.IGNORECASE
+            )
+            if pfas6_match:
+                val = pfas6_match.group(1)
+                results["pfas6"] = 0.0 if val == "ND" else float(val)
 
     # Extract all 18 compounds
     for short_name, long_name, _in_pfas6 in PFAS_COMPOUNDS:
-        value = _extract_compound_value(content, short_name, long_name)
+        value = _extract_compound_value(
+            content, short_name, long_name, is_dw_program=is_dw_program
+        )
         results["compounds"][short_name] = value
 
     # Check for J-qualified values
     if re.search(r"\d+\.?\d*\s+J\s+ng/L", content, re.IGNORECASE):
         results["j_qualifier_present"] = True
 
-    # If PFAS6 wasn't found directly, calculate from the 6 regulated compounds
-    if results["pfas6"] is None:
-        pfas6_compounds = [
-            results["compounds"].get(name)
-            for name, _, in_pfas6 in PFAS_COMPOUNDS
-            if in_pfas6
-        ]
-        if any(v is not None for v in pfas6_compounds):
-            results["pfas6"] = sum(v or 0.0 for v in pfas6_compounds)
+    # Recompute PFAS6 from regulated compounds when:
+    #   (a) the directly-extracted value is None (no PFAS6 line found), OR
+    #   (b) the value is 0 but individual compounds show detections — this
+    #       happens with labs that follow the regulatory exclusion convention
+    #       and report PFAS6 as ND when all detections are J-qualified below
+    #       the reporting limit. We still want subscribers to see those
+    #       trace detections, so we override with the calculated sum and
+    #       rely on `j_qualifier_present` being surfaced downstream
+    #       (popup/alert/notification) so the J-qualified nature is clear.
+    pfas6_compounds = [
+        results["compounds"].get(name)
+        for name, _, in_pfas6 in PFAS_COMPOUNDS
+        if in_pfas6
+    ]
+    nonzero_compounds = [v for v in pfas6_compounds if v is not None and v > 0]
+    needs_recompute = (
+        results["pfas6"] is None
+        or (results["pfas6"] == 0 and nonzero_compounds)
+    )
+    if needs_recompute and any(v is not None for v in pfas6_compounds):
+        results["pfas6"] = sum(v or 0.0 for v in pfas6_compounds)
 
     # Pass/fail
     content_lower = content.lower()
@@ -313,28 +423,35 @@ def _parse_report(page: Page, doc_id: str) -> Optional[dict]:
     elif "suitable for drinking" in content_lower:
         results["pass_fail"] = "PASS"
     elif results["pfas6"] is not None:
-        results["pass_fail"] = "FAIL" if results["pfas6"] > 20 else "PASS"
+        results["pass_fail"] = "FAIL" if results["pfas6"] > MCL else "PASS"
     else:
         results["pass_fail"] = "UNKNOWN"
 
-    # Address — cleaned of UI chrome
-    # Check for MassDEP Drinking Water Program form format first
-    if re.search(r"Drinking Water Program|PWS INFORMATION", content, re.IGNORECASE):
+    # Address — cleaned of UI chrome (is_dw_program already computed above)
+    if is_dw_program:
         # DW Program form: two known address patterns:
         # 1. "58 Squam Road DP 07/15/2025" — address + 2-letter code + date
         # 2. "5 Anna Drive, Nantucket Customer 03/11/2025" — address + Nantucket
-        addr_match = re.search(
+        # The trailing anchor (Nantucket OR state-code-date) restricts matches
+        # to the sample-address shape; findall + last-match additionally
+        # defends against forms where multiple anchored addresses appear
+        # (e.g. customer billing + sample location), since the address closest
+        # to the result block at the bottom is empirically the sample address.
+        addr_matches = re.findall(
             r"(\d+[A-Za-z]?\s+[A-Za-z][A-Za-z\s]{2,30}"
             r"(?:Rd|Road|St|Street|Ave|Avenue|Ln|Lane|Dr|Drive|"
-            r"Way|Blvd|Ct|Court|Pl|Place)\.?)"
+            r"Way|Blvd|Ct|Court|Pl|Place|Cir|Circle|Ter|Terrace|"
+            r"Path|Trail|Trl|Highway|Hwy|Pike)\.?)"
             r"(?:,?\s*Nantucket|\s+[A-Z]{2}\s+\d{2}/\d{2}/\d{4})",
-            content, re.IGNORECASE
+            content,
+            re.IGNORECASE,
         )
-        if addr_match:
-            results["sample_address"] = addr_match.group(1).strip().rstrip(".")
-    else:
-        # Standard Barnstable County / Pace lab format
-        # Primary: "Collection Address: 24 Sesachacha Road, Nantucket"
+        if addr_matches:
+            results["sample_address"] = addr_matches[-1].strip().rstrip(".")
+
+    # Standard Barnstable County / Pace lab format — also used as fallback
+    # when the DW Program path found nothing.
+    if not results["sample_address"]:
         addr_match = re.search(
             r"Collection Address[:\s]+([^,]+,\s*Nantucket)[^\n]*", content
         )
@@ -342,17 +459,24 @@ def _parse_report(page: Page, doc_id: str) -> Optional[dict]:
             addr = addr_match.group(1).strip()
             addr = re.sub(r",?\s*$", "", addr)
             results["sample_address"] = addr
-        if not results["sample_address"]:
-            addr_match = re.search(
-                r"(\d+\s+[A-Za-z][^,]+,\s*Nantucket)\s*[A-Z]{2}\d{2}/", content
-            )
-            if addr_match:
-                results["sample_address"] = addr_match.group(1).strip()
+    if not results["sample_address"]:
+        addr_match = re.search(
+            r"(\d+\s+[A-Za-z][^,]+,\s*Nantucket)\s*[A-Z]{2}\d{2}/", content
+        )
+        if addr_match:
+            results["sample_address"] = addr_match.group(1).strip()
 
     # Sample date
     date_match = re.search(r"Sampled[:\s]*([\d/]+)", content)
     if not date_match:
-        date_match = re.search(r"Nantucket\s*[A-Z]{2}(\d{2}/\d{2}/\d{4})", content)
+        # DW Program forms render the date inline with the location row as
+        # "<address>, Nantucket, MA <COLLECTOR_INITIALS><MM/DD/YYYY>" (e.g.
+        # "Nantucket, MA KM02/06/2024"). Allow an optional comma after
+        # Nantucket and 0-3 trailing capital letters between the state code
+        # and the date for collector initials.
+        date_match = re.search(
+            r"Nantucket,?\s*[A-Z]{2}\s*[A-Z]{0,3}(\d{2}/\d{2}/\d{4})", content
+        )
     if date_match:
         results["sample_date"] = date_match.group(1)
 
