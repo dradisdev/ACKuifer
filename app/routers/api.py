@@ -158,14 +158,33 @@ def get_results(
         #   "59.4 140"   — sub-map prefix survived scraping because map_number
         #                  was "59". Real lookup is map="59.4", parcel="140".
         if coords is None and r.parcel_number:
-            candidate = r.parcel_number.strip()
-            if " & " in candidate:
-                candidate = candidate.split(" & ", 1)[0].strip()
+            # Patterns observed in the data:
+            #   "37 & 122"                — multi-parcel, & delimiter
+            #   "20, 21"                  — multi-parcel, comma delimiter
+            #   "59.4 140"                — sub-map prefix (Nantucket sub-maps
+            #                               are decimal-extended: 59.4, 73.1.3)
+            #   "59.4 134-136"            — sub-map + hyphen range
+            #   "92.4 121 TO 137"         — sub-map + verbose range
+            #   "60.3.1 425-426 & 414-..."— sub-map + range + multi
+            # In every case we resolve to the first parcel of the first parcel-
+            # group as a representative pin location.
+            candidate = re.split(
+                r"\s*[,&]\s*", r.parcel_number.strip(), maxsplit=1
+            )[0].strip()
             parts = candidate.split()
-            if len(parts) == 2:
-                coords = lookup_parcel(parts[0], parts[1])
-            elif len(parts) == 1 and candidate != r.parcel_number:
-                coords = lookup_parcel(r.map_number, candidate)
+            if len(parts) >= 2 and "." in parts[0]:
+                # Sub-map: parts[0] is the actual map (e.g. "59.4", "73.1.3").
+                # Strip hyphen ranges to first parcel ("134-136" → "134").
+                sub_parcel = parts[1].split("-", 1)[0].strip()
+                coords = lookup_parcel(parts[0], sub_parcel)
+            elif len(parts) >= 2:
+                # Multi-token, no sub-map indicator — parent map applies.
+                sub_parcel = parts[1].split("-", 1)[0].strip()
+                coords = lookup_parcel(r.map_number, sub_parcel)
+            elif len(parts) == 1 and candidate != r.parcel_number.strip():
+                # Single token from a multi-parcel split (e.g. "20" from "20, 21").
+                sub_parcel = parts[0].split("-", 1)[0].strip()
+                coords = lookup_parcel(r.map_number, sub_parcel)
         if coords is None:
             continue
         lat, lng = coords
