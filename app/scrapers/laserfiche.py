@@ -77,6 +77,34 @@ def _doc_url(doc_id: str) -> str:
     )
 
 
+def _parse_parcel_folder_name(parent_map_number: str, folder_name: str) -> tuple[str, str]:
+    """Parse a Laserfiche parcel folder name into (map_number, parcel_number).
+
+    Handles Nantucket assessor folder naming where a parcel folder inside
+    a parent "Map XX" Laserfiche folder may belong to either:
+      - the parent integer map         ("21 80"    → map="21",   parcel="80")
+      - a decimal-extended sub-map     ("59.4 140" → map="59.4", parcel="140")
+
+    Multi-parcel folder names ("21 37 & 122", "20, 21") are preserved as-is
+    in parcel_number; the display layer in app/routers/api.py splits and
+    resolves them at read time.
+
+    Returns (parent_map_number, folder_name) unchanged if the folder name
+    doesn't start with parent_map_number or a sub-map of it.
+    """
+    parts = folder_name.split(maxsplit=1)
+    if len(parts) != 2:
+        return (parent_map_number, folder_name)
+
+    candidate_map, rest = parts
+    if candidate_map == parent_map_number:
+        return (parent_map_number, rest)
+    if candidate_map.startswith(parent_map_number + "."):
+        return (candidate_map, rest)
+
+    return (parent_map_number, folder_name)
+
+
 # =============================================================================
 # Playwright navigation helpers (from prototype)
 # =============================================================================
@@ -725,12 +753,10 @@ def _process_document(
     logger.info("      NEW: %s (doc_id=%s)", doc["name"], doc_id)
     stats["new_docs_found"] += 1
 
-    # Extract parcel_number from parcel folder name
-    # Folder name format: "21 80" or "21 37 & 122"
-    parcel_number = parcel_name
-    # Strip map number prefix if present
-    if parcel_name.startswith(map_number + " "):
-        parcel_number = parcel_name[len(map_number) + 1:]
+    # Parse parcel folder name into (actual_map, parcel). Handles integer
+    # maps ("21 80") and Nantucket sub-maps ("59.4 140"). Multi-parcel
+    # folder names are preserved; api.py resolves them at display time.
+    actual_map_number, parcel_number = _parse_parcel_folder_name(map_number, parcel_name)
 
     # Parse sample date from filename (authoritative)
     date_str = _parse_sample_date_from_filename(doc["name"])
@@ -765,13 +791,13 @@ def _process_document(
         result_status = classify_result_status(float(pfas6_sum))
 
         # Geo resolution
-        geo = resolve_location(map_number, parcel_number)
+        geo = resolve_location(actual_map_number, parcel_number)
         neighborhood = geo["neighborhood"] if geo else FALLBACK_NEIGHBORHOOD
 
         compounds = parsed.get("compounds", {})
         result = PfasResult(
             laserfiche_doc_id=int(doc_id),
-            map_number=map_number,
+            map_number=actual_map_number,
             parcel_number=parcel_number,
             neighborhood=neighborhood,
             street_name=street_name,
