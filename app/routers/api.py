@@ -152,6 +152,12 @@ def get_results(
 
     for r in lf_query.all():
         coords = lookup_parcel(r.map_number, r.parcel_number)
+        # Multi-parcel folder names (e.g. "37 & 122" or "140 & 59.4 141")
+        # fail the parcel lookup. Both parcels share one well, so the first
+        # parcel's centroid is a faithful pin for display.
+        if coords is None and r.parcel_number and " & " in r.parcel_number:
+            first_parcel = r.parcel_number.split(" & ", 1)[0].strip()
+            coords = lookup_parcel(r.map_number, first_parcel)
         if coords is None:
             continue
         lat, lng = coords
