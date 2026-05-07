@@ -152,12 +152,20 @@ def get_results(
 
     for r in lf_query.all():
         coords = lookup_parcel(r.map_number, r.parcel_number)
-        # Multi-parcel folder names (e.g. "37 & 122" or "140 & 59.4 141")
-        # fail the parcel lookup. Both parcels share one well, so the first
-        # parcel's centroid is a faithful pin for display.
-        if coords is None and r.parcel_number and " & " in r.parcel_number:
-            first_parcel = r.parcel_number.split(" & ", 1)[0].strip()
-            coords = lookup_parcel(r.map_number, first_parcel)
+        # Fallbacks for non-standard parcel_number values:
+        #   "37 & 122"   — multi-parcel folder; both parcels share one well,
+        #                  use the first parcel's centroid.
+        #   "59.4 140"   — sub-map prefix survived scraping because map_number
+        #                  was "59". Real lookup is map="59.4", parcel="140".
+        if coords is None and r.parcel_number:
+            candidate = r.parcel_number.strip()
+            if " & " in candidate:
+                candidate = candidate.split(" & ", 1)[0].strip()
+            parts = candidate.split()
+            if len(parts) == 2:
+                coords = lookup_parcel(parts[0], parts[1])
+            elif len(parts) == 1 and candidate != r.parcel_number:
+                coords = lookup_parcel(r.map_number, candidate)
         if coords is None:
             continue
         lat, lng = coords
