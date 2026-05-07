@@ -307,7 +307,13 @@ function formatDate(d) {
 function buildPopupHtml(r) {
   const valueStr = formatValue(r);
   const aboveMCL = r.pfas6_sum !== null && r.pfas6_sum > MCL;
-  const isTrace = r.j_qualifier_present === true;
+  // J-qualifier flags individual compound values below the lab's reporting
+  // limit. On HIGH-DETECT and HAZARD results the regulatory classification
+  // comes from the *non*-J-qualified compounds; the "Trace" label reads as
+  // "trace amount" and contradicts the actual reading. Suppress it there.
+  const isTrace = r.j_qualifier_present === true
+    && r.result_status !== 'HIGH-DETECT'
+    && r.result_status !== 'HAZARD';
   const traceBadge = isTrace
     ? ' <span class="trace-badge" title="Trace detection: one or more values were measured below the lab&apos;s reporting limit and are estimated">Trace</span>'
     : '';
@@ -395,7 +401,7 @@ function renderMarkers() {
       <td>
         <span class="status-badge status-${r.result_status}">${r.result_status}</span>
         ${r.is_retest ? '<span class="retest-badge">Retest</span>' : ''}
-        ${r.j_qualifier_present ? '<span class="trace-badge" title="Trace detection: estimated below lab reporting limit">Trace</span>' : ''}
+        ${r.j_qualifier_present && r.result_status !== 'HIGH-DETECT' && r.result_status !== 'HAZARD' ? '<span class="trace-badge" title="Trace detection: estimated below lab reporting limit">Trace</span>' : ''}
       </td>
       <td>${formatDate(r.sample_date)}</td>
       <td>${r.source_doc_url ? `<a href="${r.source_doc_url}" target="_blank">Report</a>` : '—'}</td>
