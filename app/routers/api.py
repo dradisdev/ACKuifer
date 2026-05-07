@@ -184,8 +184,13 @@ def get_results(
                 # by the branch above using parts[1].
                 sub_parcel = parts[0].split("-", 1)[0].strip()
                 coords = lookup_parcel(r.map_number, sub_parcel)
-            elif len(parts) == 1 and candidate != r.parcel_number.strip():
-                # Single token from a multi-parcel split (e.g. "20" from "20, 21").
+            elif len(parts) == 1:
+                # Single token. Hyphen-strip catches "134-136" → "134"
+                # (post-backfill ranges); also catches single tokens from
+                # multi-parcel splits ("20" from "20, 21"). If the value
+                # has no hyphen and didn't come from a split, this is a
+                # redundant lookup but harmless — same args as the initial
+                # call which already returned None.
                 sub_parcel = parts[0].split("-", 1)[0].strip()
                 coords = lookup_parcel(r.map_number, sub_parcel)
         if coords is None:
