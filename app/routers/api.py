@@ -178,8 +178,11 @@ def get_results(
                 sub_parcel = parts[1].split("-", 1)[0].strip()
                 coords = lookup_parcel(parts[0], sub_parcel)
             elif len(parts) >= 2:
-                # Multi-token, no sub-map indicator — parent map applies.
-                sub_parcel = parts[1].split("-", 1)[0].strip()
+                # Multi-token, no sub-map prefix — parts[0] is the first
+                # parcel itself (e.g. "220-224 226 274-278" → "220").
+                # The sub-map case (parts[0] contains ".") is handled
+                # by the branch above using parts[1].
+                sub_parcel = parts[0].split("-", 1)[0].strip()
                 coords = lookup_parcel(r.map_number, sub_parcel)
             elif len(parts) == 1 and candidate != r.parcel_number.strip():
                 # Single token from a multi-parcel split (e.g. "20" from "20, 21").
