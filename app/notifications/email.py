@@ -39,11 +39,9 @@ def _result_to_email_row(result, source: str) -> dict:
             f"https://portal.laserfiche.com/Portal/DocView.aspx"
             f"?id={result.laserfiche_doc_id}&repo=r-ec7bdbfe"
         )
-        j_qualified = bool(result.j_qualifier_present)
     else:
         street = _clean_sd_street_name(result.sample_location)
         doc_url = result.source_doc_url.split("#")[0] if result.source_doc_url else None
-        j_qualified = False
 
     pfas6 = float(result.pfas6_sum) if result.pfas6_sum is not None else 0.0
 
@@ -55,7 +53,6 @@ def _result_to_email_row(result, source: str) -> dict:
         "sample_date_raw": result.sample_date,
         "source_doc_url": doc_url,
         "result_status": result.result_status,
-        "j_qualified": j_qualified,
         "above_sms_threshold": pfas6 >= SMS_THRESHOLD,
         "above_mcl": pfas6 > MCL,
         "source_label": "Board of Health" if source == "laserfiche" else "MassDEP Source Discovery",
@@ -201,8 +198,6 @@ def _build_digest_html(neighborhood: str, rows: list, unsubscribe_url: str, mana
     detections = _sort_with_retest_groups(detections)
     non_detects = _sort_with_retest_groups(non_detects)
 
-    any_j_qualified = any(r["j_qualified"] for r in rows)
-
     # Build result rows HTML
     def _row_html(r: dict) -> str:
         highlight = r["above_sms_threshold"]
@@ -210,11 +205,6 @@ def _build_digest_html(neighborhood: str, rows: list, unsubscribe_url: str, mana
         bold = "font-weight:700;" if highlight else ""
         value_color = "color:#E53E3E;" if r["above_mcl"] else ""
         mcl_badge = ' <span style="color:#E53E3E;font-weight:700;font-size:12px;">Above MCL</span>' if r["above_mcl"] else ""
-        trace_badge = (
-            ' <span style="color:#744210;background:#FEFCBF;border:1px solid #F6E05E;'
-            'padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600;">Trace</span>'
-            if r["j_qualified"] else ""
-        )
         doc_link = f'<a href="{r["source_doc_url"]}" style="color:#2B6CB0;text-decoration:none;">View report</a>' if r["source_doc_url"] else "\u2014"
 
         # Retest indicator
@@ -237,7 +227,7 @@ def _build_digest_html(neighborhood: str, rows: list, unsubscribe_url: str, mana
 
         return f"""<tr style="background:{bg};">
   <td style="padding:10px 12px;border-bottom:1px solid #EDF2F7;{bold}">{street_display}</td>
-  <td style="padding:10px 12px;border-bottom:1px solid #EDF2F7;{bold}{value_color}">{r["value_display"]}{mcl_badge}{trace_badge}</td>
+  <td style="padding:10px 12px;border-bottom:1px solid #EDF2F7;{bold}{value_color}">{r["value_display"]}{mcl_badge}</td>
   <td style="padding:10px 12px;border-bottom:1px solid #EDF2F7;">{r["sample_date"]}</td>
   <td style="padding:10px 12px;border-bottom:1px solid #EDF2F7;">{r["source_label"]}</td>
   <td style="padding:10px 12px;border-bottom:1px solid #EDF2F7;">{doc_link}</td>
@@ -284,15 +274,6 @@ def _build_digest_html(neighborhood: str, rows: list, unsubscribe_url: str, mana
   </tbody>
 </table>"""
 
-    j_footnote = ""
-    if any_j_qualified:
-        j_footnote = """
-<p style="font-size:12px;color:#744210;margin-top:16px;font-style:italic;">
-  Results marked <span style="color:#744210;background:#FEFCBF;border:1px solid #F6E05E;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600;font-style:normal;">Trace</span>
-  contain one or more values measured below the lab's reporting limit. These are estimated
-  detections; the lab classifies them as non-detect for regulatory reporting. See source report for full compound breakdown.
-</p>"""
-
     return f"""<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
@@ -315,7 +296,6 @@ def _build_digest_html(neighborhood: str, rows: list, unsubscribe_url: str, mana
 
     {detection_section}
     {non_detect_section}
-    {j_footnote}
 
     <div style="margin-top:24px;padding-top:16px;border-top:1px solid #EDF2F7;">
       <p style="font-size:13px;color:#718096;margin:0;">
