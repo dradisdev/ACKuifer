@@ -159,6 +159,42 @@ PACE_COMPOUND_LINE_RE = re.compile(
 
 
 # =============================================================================
+# Admin form detection — MassDEP BWSC transmittal/inspection cover sheets
+# =============================================================================
+# These are administrative documents on the EEA portal docket alongside actual
+# lab reports. They contain no sample data; the lab data they reference is
+# published as a separate PDF entry on the same docket.
+
+ADMIN_FORM_PATTERNS = [
+    # BWSC Document Upload Form (transmittal cover sheet)
+    re.compile(r"Transmittal\s+Form\s+to\s+Record\s*[\n\s]+DEP\s+Uploaded\s+Documents", re.I),
+    # BWSC Inspection / Meeting Form (field activity record).
+    # Matched by the unique narrative heading rather than the page header,
+    # since pdfplumber places "Release Tracking Number" before the
+    # "INSPECTION MEETING" header depending on PDF layout.
+    re.compile(r"Description\s+of\s+Inspection\s+Meetings?\s+(?:&|and)\s+Comments", re.I),
+    # BWSC 101 Release Log Form (initial release reporting)
+    re.compile(r"RELEASE\s+LOG\s+FORM", re.I),
+    # BWSC 102 Release Amendment Form (amendments to prior releases)
+    re.compile(r"RELEASE\s+AMENDMENT\s+FORM", re.I),
+]
+
+
+class AdminFormSkip(Exception):
+    """Raised when a PDF is a MassDEP administrative form with no sample data.
+    Distinct from parse errors so it can be marked as deliberately skipped."""
+    pass
+
+
+def _is_admin_form(text: str) -> bool:
+    """Returns True if text matches a known MassDEP administrative form layout."""
+    for pattern in ADMIN_FORM_PATTERNS:
+        if pattern.search(text):
+            return True
+    return False
+
+
+# =============================================================================
 # Utility helpers
 # =============================================================================
 
@@ -1144,6 +1180,11 @@ def _parse_pdf(pdf_path: str) -> Optional[list[dict]]:
         logger.error("pdfplumber error on %s: %s", path.name, e)
         return None
 
+    # Skip BWSC admin forms before format dispatch — they have no sample data
+    # and would otherwise generate spurious "no sample locations" errors.
+    if _is_admin_form(all_text):
+        raise AdminFormSkip("BWSC administrative form — no sample data")
+
     fmt = _detect_format(all_text)
     logger.info("  Detected format: %s", fmt)
 
@@ -1578,6 +1619,17 @@ def _process_eea_document(
                 if seen:
                     seen.parse_status = "success"
                 db.commit()
+
+        except AdminFormSkip as e:
+            logger.info("  Skipped (admin form): %s", doc["title"])
+            with SessionLocal() as db:
+                seen = db.query(SeenDocument).filter_by(doc_key=doc_url).first()
+                if seen:
+                    seen.parse_status = "skipped_admin_form"
+                    seen.error_message = str(e)[:2000]
+                db.commit()
+            # Not an error — don't increment parse_errors
+            return
 
         except Exception as e:
             logger.error("Parse error for %s: %s", doc["title"], e, exc_info=True)
