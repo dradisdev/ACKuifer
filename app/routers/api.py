@@ -128,6 +128,47 @@ def _clean_sd_street_name(sample_location: str) -> str:
     return street_abbrev
 
 
+def _parcel_lookup_candidates(map_number: str, parcel_number: str):
+    """Yield (map, parcel) pairs to try, in priority order, when the direct
+    lookup_parcel() call returns None. All resolution is display-only; the
+    stored parcel_number is unchanged.
+
+    Preserves the prior paths (sub-map prefix, hyphen ranges, multi-parcel
+    folders) and adds three things from the Session 15 audit:
+      - "/" as a multi-parcel delimiter ("137/141"), alongside "," and "&"
+      - trying EVERY parcel group, not just the first — "20, 21" resolves via
+        "21" when "20" isn't in the parcel layer (doc 362271)
+      - decimal sub-parcel -> integer-parent retry ("19.1" -> "19"): the exact
+        sub-parcel is absent from the GeoJSON but the parent lot is present, so
+        the parent centroid is used as an APPROXIMATE pin.
+
+    Exact candidates (all groups) are yielded before any decimal-parent
+    approximation, so an exact sibling parcel always beats a parent guess.
+    """
+    raw = (parcel_number or "").strip()
+    groups = [g.strip() for g in re.split(r"\s*[,&/]\s*", raw) if g.strip()]
+
+    exact: list[tuple[str, str]] = []
+    for group in groups:
+        parts = group.split()
+        if len(parts) >= 2 and "." in parts[0]:
+            sub_map = parts[0]
+            parcel = parts[1].split("-", 1)[0].strip()
+        elif parts:
+            sub_map = map_number
+            parcel = parts[0].split("-", 1)[0].strip()
+        else:
+            continue
+        if parcel:
+            exact.append((sub_map, parcel))
+
+    for pair in exact:
+        yield pair
+    for sub_map, parcel in exact:
+        if "." in parcel:
+            yield (sub_map, parcel.split(".")[0])
+
+
 @router.get("/results")
 def get_results(
     neighborhood: Optional[str] = None,
@@ -161,44 +202,17 @@ def get_results(
         #   "59.4 140"   — sub-map prefix survived scraping because map_number
         #                  was "59". Real lookup is map="59.4", parcel="140".
         if coords is None and r.parcel_number:
-            # Patterns observed in the data:
-            #   "37 & 122"                — multi-parcel, & delimiter
-            #   "20, 21"                  — multi-parcel, comma delimiter
-            #   "59.4 140"                — sub-map prefix (Nantucket sub-maps
-            #                               are decimal-extended: 59.4, 73.1.3)
-            #   "59.4 134-136"            — sub-map + hyphen range
-            #   "92.4 121 TO 137"         — sub-map + verbose range
-            #   "60.3.1 425-426 & 414-..."— sub-map + range + multi
-            # In every case we resolve to the first parcel of the first parcel-
-            # group as a representative pin location.
-            candidate = re.split(
-                r"\s*[,&]\s*", r.parcel_number.strip(), maxsplit=1
-            )[0].strip()
-            parts = candidate.split()
-            if len(parts) >= 2 and "." in parts[0]:
-                # Sub-map: parts[0] is the actual map (e.g. "59.4", "73.1.3").
-                # Strip hyphen ranges to first parcel ("134-136" → "134").
-                sub_parcel = parts[1].split("-", 1)[0].strip()
-                resolved_map, resolved_parcel = parts[0], sub_parcel
-                coords = lookup_parcel(resolved_map, resolved_parcel)
-            elif len(parts) >= 2:
-                # Multi-token, no sub-map prefix — parts[0] is the first
-                # parcel itself (e.g. "220-224 226 274-278" → "220").
-                # The sub-map case (parts[0] contains ".") is handled
-                # by the branch above using parts[1].
-                sub_parcel = parts[0].split("-", 1)[0].strip()
-                resolved_map, resolved_parcel = r.map_number, sub_parcel
-                coords = lookup_parcel(resolved_map, resolved_parcel)
-            elif len(parts) == 1:
-                # Single token. Hyphen-strip catches "134-136" → "134"
-                # (post-backfill ranges); also catches single tokens from
-                # multi-parcel splits ("20" from "20, 21"). If the value
-                # has no hyphen and didn't come from a split, this is a
-                # redundant lookup but harmless — same args as the initial
-                # call which already returned None.
-                sub_parcel = parts[0].split("-", 1)[0].strip()
-                resolved_map, resolved_parcel = r.map_number, sub_parcel
-                coords = lookup_parcel(resolved_map, resolved_parcel)
+            # Non-standard parcel_number: try each candidate (sub-map prefix,
+            # hyphen-stripped, every parcel group across , & / delimiters, then
+            # decimal-parent approximations) and take the first that resolves.
+            # See _parcel_lookup_candidates for the ordering / rationale.
+            for cand_map, cand_parcel in _parcel_lookup_candidates(
+                r.map_number, r.parcel_number
+            ):
+                coords = lookup_parcel(cand_map, cand_parcel)
+                if coords:
+                    resolved_map, resolved_parcel = cand_map, cand_parcel
+                    break
         if coords is None:
             continue
         lat, lng = coords
