@@ -19,14 +19,18 @@ logger = logging.getLogger(__name__)
 
 _DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 _GEOJSON_PATH = _DATA_DIR / "nantucket_parcels.geojson"
+_STREET_INDEX_PATH = _DATA_DIR / "parcel_streets.json"
 
-# Parcel index: MAP_PAR_ID → (lat, lng)
+# Parcel indices: MAP_PAR_ID → (lat, lng), and MAP_PAR_ID → street name.
+# The street-name index is precomputed by scripts/build_parcel_street_index.py
+# via Nominatim reverse-geocoding of each parcel centroid.
 _parcel_centroids: dict[str, tuple[float, float]] = {}
+_parcel_streets: dict[str, str] = {}
 _loaded = False
 
 
 def _load():
-    global _parcel_centroids, _loaded
+    global _parcel_centroids, _parcel_streets, _loaded
     if _loaded:
         return
 
@@ -42,8 +46,31 @@ def _load():
         centroid = geom.centroid
         _parcel_centroids[par_id] = (centroid.y, centroid.x)  # (lat, lng)
 
-    _loaded = True
     logger.info("Loaded %d parcel centroids", len(_parcel_centroids))
+
+    # Load the precomputed street-name sidecar if present. Built by
+    # scripts/build_parcel_street_index.py via Nominatim reverse-geocoding.
+    # Used as a fallback when a Laserfiche PDF has no embedded sample address
+    # (third-party-submitter reports like Eurofins for Island Water Filtration).
+    # Missing file → parcel_street_name() returns None and the popup falls
+    # back to "Unknown location" — same as pre-feature behavior.
+    if _STREET_INDEX_PATH.exists():
+        with open(_STREET_INDEX_PATH) as f:
+            _parcel_streets = json.load(f)
+        logger.info(
+            "Loaded %d parcel street names from %s",
+            len(_parcel_streets),
+            _STREET_INDEX_PATH.name,
+        )
+    else:
+        logger.warning(
+            "Parcel street index not found at %s — parcel_street_name() will "
+            "return None for all parcels. Run "
+            "scripts/build_parcel_street_index.py to generate.",
+            _STREET_INDEX_PATH,
+        )
+
+    _loaded = True
 
 
 def lookup_parcel(map_number: str, parcel_number: str) -> Optional[tuple[float, float]]:
@@ -66,4 +93,38 @@ def lookup_parcel(map_number: str, parcel_number: str) -> Optional[tuple[float, 
             return result
 
     logger.warning("Parcel not found: %s", key)
+    return None
+
+
+def parcel_street_name(map_number: str, parcel_number: str) -> Optional[str]:
+    """Return the display street name for a parcel, or None if not indexed.
+
+    Used as a fallback when a Laserfiche PDF has no embedded sample address —
+    e.g. third-party-submitter reports (Eurofins for Island Water Filtration)
+    that test water on behalf of an unnamed homeowner. The Town parcel
+    placement of the Laserfiche folder identifies the property even when the
+    PDF doesn't, so the same map_number / parcel_number that produces the pin
+    coordinates also names the street.
+
+    Backed by data/parcel_streets.json, precomputed by
+    scripts/build_parcel_street_index.py via Nominatim reverse-geocoding of
+    each parcel centroid. Empty-string entries (parcel had no nearby road —
+    water, wetland, etc.) are treated as misses.
+
+    Callers should pass the same (map_number, parcel_number) pair that
+    successfully resolved coordinates via lookup_parcel(). Mirrors
+    lookup_parcel's internal "&" fallback so a result like ("21", "37 & 122")
+    — which lookup_parcel resolves via the first parcel — also resolves to
+    a street name.
+    """
+    _load()
+    key = f"{map_number} {parcel_number}"
+    result = _parcel_streets.get(key)
+    if result:  # non-empty string
+        return result
+    if "&" in parcel_number:
+        first_parcel = parcel_number.split("&")[0].strip()
+        result = _parcel_streets.get(f"{map_number} {first_parcel}")
+        if result:
+            return result
     return None

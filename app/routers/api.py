@@ -12,7 +12,7 @@ from app.config import RETEST_WINDOW_DAYS
 from app.database import get_db, SessionLocal
 from app.models.results import PfasResult, SourceDiscoveryResult
 from app.models.site_config import SiteConfig
-from app.geo.parcel_lookup import lookup_parcel
+from app.geo.parcel_lookup import lookup_parcel, parcel_street_name
 
 router = APIRouter(prefix="/api", tags=["api"])
 
@@ -151,7 +151,10 @@ def get_results(
         lf_query = lf_query.filter(PfasResult.sample_date >= cutoff)
 
     for r in lf_query.all():
-        coords = lookup_parcel(r.map_number, r.parcel_number)
+        # Track which (map, parcel) pair successfully resolved coords; the
+        # same pair is reused for the street-name fallback below (Subclass B).
+        resolved_map, resolved_parcel = r.map_number, r.parcel_number
+        coords = lookup_parcel(resolved_map, resolved_parcel)
         # Fallbacks for non-standard parcel_number values:
         #   "37 & 122"   — multi-parcel folder; both parcels share one well,
         #                  use the first parcel's centroid.
@@ -176,14 +179,16 @@ def get_results(
                 # Sub-map: parts[0] is the actual map (e.g. "59.4", "73.1.3").
                 # Strip hyphen ranges to first parcel ("134-136" → "134").
                 sub_parcel = parts[1].split("-", 1)[0].strip()
-                coords = lookup_parcel(parts[0], sub_parcel)
+                resolved_map, resolved_parcel = parts[0], sub_parcel
+                coords = lookup_parcel(resolved_map, resolved_parcel)
             elif len(parts) >= 2:
                 # Multi-token, no sub-map prefix — parts[0] is the first
                 # parcel itself (e.g. "220-224 226 274-278" → "220").
                 # The sub-map case (parts[0] contains ".") is handled
                 # by the branch above using parts[1].
                 sub_parcel = parts[0].split("-", 1)[0].strip()
-                coords = lookup_parcel(r.map_number, sub_parcel)
+                resolved_map, resolved_parcel = r.map_number, sub_parcel
+                coords = lookup_parcel(resolved_map, resolved_parcel)
             elif len(parts) == 1:
                 # Single token. Hyphen-strip catches "134-136" → "134"
                 # (post-backfill ranges); also catches single tokens from
@@ -192,7 +197,8 @@ def get_results(
                 # redundant lookup but harmless — same args as the initial
                 # call which already returned None.
                 sub_parcel = parts[0].split("-", 1)[0].strip()
-                coords = lookup_parcel(r.map_number, sub_parcel)
+                resolved_map, resolved_parcel = r.map_number, sub_parcel
+                coords = lookup_parcel(resolved_map, resolved_parcel)
         if coords is None:
             continue
         lat, lng = coords
@@ -200,13 +206,20 @@ def get_results(
             f"https://portal.laserfiche.com/Portal/DocView.aspx"
             f"?id={r.laserfiche_doc_id}&repo=r-ec7bdbfe"
         )
+        # Subclass B fallback: some Laserfiche PDFs are third-party submitter
+        # reports (e.g. Eurofins for Island Water Filtration) with no embedded
+        # sample address, so r.street_name is None. The Town parcel placement
+        # of the folder identifies the property even when the PDF doesn't —
+        # look the street name up from the same parcel index that produced
+        # the coordinates.
+        street_name = r.street_name or parcel_street_name(resolved_map, resolved_parcel)
         results.append({
             "id": str(r.id),
             "source": "laserfiche",
             "lat": lat,
             "lng": lng,
             "neighborhood": r.neighborhood,
-            "street_name": r.street_name,
+            "street_name": street_name,
             "map_number": r.map_number,
             "parcel_number": r.parcel_number,
             "pfas6_sum": float(r.pfas6_sum) if r.pfas6_sum is not None else None,

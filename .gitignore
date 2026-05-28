@@ -100,3 +100,6 @@ BUILD_NOTES.txt
 
 # Diagnostic trace artifacts (parse_pdf_dry.py --trace)
 *trace*.txt
+
+# Local-only diagnostic scripts
+scripts/
