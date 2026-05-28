@@ -457,25 +457,61 @@ def _parse_report_text(content: str) -> dict:
 
     # Address — cleaned of UI chrome (is_dw_program already computed above)
     if is_dw_program:
-        # DW Program form: two known address patterns:
-        # 1. "58 Squam Road DP 07/15/2025" — address + 2-letter code + date
-        # 2. "5 Anna Drive, Nantucket Customer 03/11/2025" — address + Nantucket
-        # The trailing anchor (Nantucket OR state-code-date) restricts matches
-        # to the sample-address shape; findall + last-match additionally
-        # defends against forms where multiple anchored addresses appear
-        # (e.g. customer billing + sample location), since the address closest
-        # to the result block at the bottom is empirically the sample address.
-        addr_matches = re.findall(
-            r"(\d+[A-Za-z]?\s+[A-Za-z][A-Za-z\s]{2,30}"
-            r"(?:Rd|Road|St|Street|Ave|Avenue|Ln|Lane|Dr|Drive|"
-            r"Way|Blvd|Ct|Court|Pl|Place|Cir|Circle|Ter|Terrace|"
-            r"Path|Trail|Trl|Highway|Hwy|Pike)\.?)"
-            r"(?:,?\s*Nantucket|\s+[A-Z]{2}\s+\d{2}/\d{2}/\d{4})",
+        # Primary: column-header-anchored line extraction.
+        # The DW Program form has a unique header row "MassDEP Location Name
+        # Sample Information Date Collected Collected By" with the address
+        # rendered on the next line in a stable shape:
+        #     "<ADDRESS>[, Nantucket[, m/p: <M> <P>]][ <COLLECTOR>]<DATE>(F)inished..."
+        # where <COLLECTOR> is 2-3 uppercase initials (BG/MT/SP/DP/KM) or the
+        # literal word "Customer", sometimes jammed against the date with no
+        # space. Peel each layer off.
+        #
+        # This path catches variants the regex below misses: addresses with
+        # apostrophes (Lover's Lane), addresses MassDEP truncated to no street
+        # suffix (Hummock Pond), and jammed collector+date forms (Rd.BG…,
+        # Road DP07/…) where the existing anchor's whitespace requirement fails.
+        header_match = re.search(
+            r"MassDEP\s+Location\s+Name\s+Sample\s+Information\s+Date\s+Collected"
+            r"\s+Collected\s+By\s*\n([^\n]+)",
             content,
-            re.IGNORECASE,
         )
-        if addr_matches:
-            results["sample_address"] = addr_matches[-1].strip().rstrip(".")
+        if header_match:
+            line = header_match.group(1).strip()
+            # Defensive: drop everything from "(F)inished" onward (next column).
+            line = re.sub(r"\(F\)inished.*$", "", line).strip()
+            # Strip date + optional collector token directly preceding it.
+            # Case-sensitive on the initials class so we don't accidentally
+            # consume a street suffix like "Rd"/"Ln".
+            line = re.sub(
+                r"\s*(?:[A-Z]{2,3}|\s+Customer)?\s*\d{1,2}/\d{1,2}/\d{4}.*$",
+                "",
+                line,
+            ).strip()
+            # Strip ", m/p: <map> <parcel>" admin metadata if present.
+            line = re.sub(r",\s*m/p:?.*$", "", line, flags=re.I).strip()
+            # Strip trailing ", Nantucket".
+            line = re.sub(r",?\s*Nantucket\s*$", "", line, flags=re.I).strip()
+            # Strip trailing punctuation noise.
+            line = line.rstrip(",.").strip()
+            if line:
+                results["sample_address"] = line
+
+        # Fallback: original DW Program regex. Retained for defensiveness if
+        # the column-header anchor is absent or text-damaged. Strict in shape;
+        # requires a recognized street suffix and explicit Nantucket-or-
+        # state-code-and-date anchor.
+        if not results["sample_address"]:
+            addr_matches = re.findall(
+                r"(\d+[A-Za-z]?\s+[A-Za-z][A-Za-z\s]{2,30}"
+                r"(?:Rd|Road|St|Street|Ave|Avenue|Ln|Lane|Dr|Drive|"
+                r"Way|Blvd|Ct|Court|Pl|Place|Cir|Circle|Ter|Terrace|"
+                r"Path|Trail|Trl|Highway|Hwy|Pike)\.?)"
+                r"(?:,?\s*Nantucket|\s+[A-Z]{2}\s+\d{2}/\d{2}/\d{4})",
+                content,
+                re.IGNORECASE,
+            )
+            if addr_matches:
+                results["sample_address"] = addr_matches[-1].strip().rstrip(".")
 
     # Standard Barnstable County / Pace lab format — also used as fallback
     # when the DW Program path found nothing.
