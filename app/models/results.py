@@ -32,6 +32,12 @@ class PfasResult(Base):
     discovered_at = Column(DateTime(timezone=True), server_default=func.now())
     hidden = Column(Boolean, default=False)
     notified_at = Column(DateTime(timezone=True), nullable=True)
+    # Display-only placement override. When set (format "MAP/PARCEL", e.g.
+    # "67/999.9"), the map API resolves coordinates/street from THIS parcel
+    # instead of map_number/parcel_number. Used when the record's true parcel
+    # is correct but absent from the GeoJSON layer. Stored map_number/
+    # parcel_number stay truthful to the source document. See doc 302830.
+    parcel_override = Column(String, nullable=True)
 
 
 class SourceDiscoveryResult(Base):
