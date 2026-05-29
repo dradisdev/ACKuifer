@@ -343,18 +343,3 @@ def _get_retest_window_days(db: Session) -> int:
         pass
     return RETEST_WINDOW_DAYS
     
-    # --- TEMPORARY diagnostic — REMOVE before merging to main (Session 16/17) ---
-@router.get("/_diag")
-def _diag(db: Session = Depends(get_db)):
-    """TEMPORARY diagnostic — remove after staging DB investigation."""
-    from sqlalchemy import text
-    ident = db.execute(text(
-        "SELECT current_database(), inet_server_addr()::text, inet_server_port()"
-    )).first()
-    count = db.execute(text("SELECT COUNT(*) FROM pfas_results")).scalar()
-    return {
-        "database": ident[0],
-        "server": ident[1],
-        "port": ident[2],
-        "pfas_results_count": count,
-    }
