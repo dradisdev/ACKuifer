@@ -70,6 +70,20 @@ def _well_id_to_street(well_id: str) -> str:
 
     return "Monitoring Well"
 
+def strip_unit_designator(street_name):
+    """Remove a trailing unit/apartment designator for public display,
+    consistent with the house-number rule (CLAUDE.md). Conservative: only
+    strips a recognized unit keyword (or '#') + identifier at the END, so
+    legitimate street tokens are never touched.
+        "Waydale Road Unit D" -> "Waydale Road";  "Surfside Road" unchanged
+    """
+    if not street_name:
+        return street_name
+    cleaned = re.sub(
+        r"\s+(?:unit|apt|apartment|suite|ste|#)\b\s*[#]?\s*[A-Za-z0-9\-]{1,4}\s*$",
+        "", street_name, flags=re.I,
+    ).strip()
+    return cleaned or street_name
 
 def _clean_sd_street_name(sample_location: str) -> str:
     """Strip house number and medium suffix from a Source Discovery sample_location.
@@ -192,10 +206,20 @@ def get_results(
         lf_query = lf_query.filter(PfasResult.sample_date >= cutoff)
 
     for r in lf_query.all():
-        # Track which (map, parcel) pair successfully resolved coords; the
-        # same pair is reused for the street-name fallback below (Subclass B).
-        resolved_map, resolved_parcel = r.map_number, r.parcel_number
-        coords = lookup_parcel(resolved_map, resolved_parcel)
+        # Display-only placement override (see PfasResult.parcel_override).
+        # The record's true parcel may be correct but missing from the GeoJSON
+        # layer; parcel_override names a real, in-layer parcel on the same
+        # property for pin + street. Stored map/parcel stay truthful to source.
+        if r.parcel_override and "/" in r.parcel_override:
+            resolved_map, resolved_parcel = (
+                p.strip() for p in r.parcel_override.split("/", 1)
+            )
+            coords = lookup_parcel(resolved_map, resolved_parcel)
+        else:
+            # Track which (map, parcel) pair successfully resolved coords; the
+            # same pair is reused for the street-name fallback below (Subclass B).
+            resolved_map, resolved_parcel = r.map_number, r.parcel_number
+            coords = lookup_parcel(resolved_map, resolved_parcel)
         # Fallbacks for non-standard parcel_number values:
         #   "37 & 122"   — multi-parcel folder; both parcels share one well,
         #                  use the first parcel's centroid.
@@ -226,7 +250,9 @@ def get_results(
         # of the folder identifies the property even when the PDF doesn't —
         # look the street name up from the same parcel index that produced
         # the coordinates.
-        street_name = r.street_name or parcel_street_name(resolved_map, resolved_parcel)
+        street_name = strip_unit_designator(
+            r.street_name or parcel_street_name(resolved_map, resolved_parcel)
+            )
         results.append({
             "id": str(r.id),
             "source": "laserfiche",
