@@ -49,7 +49,10 @@ def run_notifications(scrape_run_id: str, db: Session) -> dict:
     if source == "laserfiche":
         lf_results = (
             db.query(PfasResult)
-            .filter(PfasResult.notified_at.is_(None))
+            .filter(
+                PfasResult.notified_at.is_(None),
+                PfasResult.hidden == False,
+            )
             .all()
         )
     elif source == "massdep":
@@ -60,6 +63,7 @@ def run_notifications(scrape_run_id: str, db: Session) -> dict:
                 SourceDiscoveryResult.latitude.isnot(None),
                 SourceDiscoveryResult.longitude.isnot(None),
                 SourceDiscoveryResult.geocode_review_needed == False,
+                SourceDiscoveryResult.hidden == False,
                 SourceDiscoveryResult.medium != "soil",
             )
             .all()
