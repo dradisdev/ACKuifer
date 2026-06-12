@@ -33,9 +33,16 @@ USAGE
     python -m scripts.backfill_pattern_a --limit 200 --apply --commit-changes
 
 CRITERIA for Pattern A candidate:
-    pfas6_sum = 0
-    AND j_qualifier_present = False  (Pattern A is DW Program forms;
-                                       J-qualifier signals Pattern B)
+    pfas6_sum < GREATEST(the six regulated compound values)
+        (stored sum less than the largest single component is
+         mathematically impossible for a correct sum => parser-corrupt.
+         This is the detector's Partition A definition. Supersedes the
+         earlier `pfas6_sum = 0` signature, which only caught the subset
+         where the PFAS6 regex captured ".0"; the current population
+         stores small nonzero fragments like 0.8 from "20.8".)
+    AND j_qualifier_present = False  (J-qualifier signals the lab-math
+                                       class / Partition B, handled by
+                                       admin review, not re-parse)
     AND at least one regulated compound column is non-null
     AND hidden = False
 
@@ -49,8 +56,11 @@ SAFETY GUARDS:
        Restore is a manual operation but the data is preserved.
     4. Each record commits in its own transaction. Mid-run failure
        on one record doesn't roll back records already committed.
-    5. Idempotent: filter excludes records with pfas6_sum > 0, so
-       re-running on already-fixed records is a no-op.
+    5. Idempotent: a correctly-summed record always has
+       pfas6_sum >= its largest single component, so once a record is
+       fixed it no longer matches the `pfas6_sum < greatest(component)`
+       filter and re-running skips it. Additionally, the per-record
+       `unchanged` check makes re-parsing an already-correct record a NOOP.
     6. Failed records (parser returns None, exception raised) are
        skipped, logged, and don't block subsequent records. Re-run
        to retry them.
@@ -85,7 +95,7 @@ from dotenv import load_dotenv  # noqa: E402
 
 load_dotenv(_PROJECT_ROOT / ".env")
 
-from sqlalchemy import or_  # noqa: E402
+from sqlalchemy import func, or_, text  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 from app.config import classify_result_status  # noqa: E402
@@ -114,9 +124,32 @@ def _setup_file_logging(timestamp: str) -> Path:
 
 def _find_pattern_a_candidates(db, doc_id_filter: int = None):
     """Query Pattern A candidates. If doc_id_filter is provided, narrow to
-    just that record (still applying all other criteria as a safety check)."""
+    just that record (still applying all other criteria as a safety check).
+
+    Candidate rule (updated): a record is a Pattern A candidate when its
+    stored pfas6_sum is LESS THAN the largest single regulated compound --
+    mathematically impossible if pfas6_sum were a correct sum, so the stored
+    value (and components) are parser-corrupt. This matches the detector's
+    Partition A definition exactly (the 56 mangled records).
+
+    NOTE: the original filter used `pfas6_sum == 0`, which matched the
+    earlier Bug #4 signature (PFAS6 regex captured ".0"). The current
+    population stores small nonzero fragments (e.g. 0.8 from "20.8"), so the
+    `< greatest(component)` rule is the correct selector. The records with
+    `pfas6_sum >= greatest(component)` but a sum discrepancy are the lab-math
+    class (Partition B) and are intentionally NOT selected here -- they are
+    handled by admin review, not re-parse.
+    """
+    largest_component = func.greatest(
+        func.coalesce(PfasResult.pfos, 0),
+        func.coalesce(PfasResult.pfoa, 0),
+        func.coalesce(PfasResult.pfhxs, 0),
+        func.coalesce(PfasResult.pfna, 0),
+        func.coalesce(PfasResult.pfhpa, 0),
+        func.coalesce(PfasResult.pfda, 0),
+    )
     q = db.query(PfasResult).filter(
-        PfasResult.pfas6_sum == Decimal("0"),
+        func.coalesce(PfasResult.pfas6_sum, 0) < largest_component,
         PfasResult.j_qualifier_present == False,  # noqa: E712
         PfasResult.hidden == False,  # noqa: E712
         or_(
@@ -212,6 +245,15 @@ def main():
         action="store_true",
         help="Run Playwright with headless=False so you can watch the browser drive.",
     )
+    parser.add_argument(
+        "--expect-env",
+        choices=["staging", "prod"],
+        required=True,
+        help="REQUIRED. The environment you intend to run against. The script "
+             "confirms the connected DB matches (by server addr + row count) and "
+             "ABORTS on mismatch, so it can never run against the wrong DB. "
+             "staging=zephyr/10.195.138.142, prod=caboose/10.169.100.153.",
+    )
     args = parser.parse_args()
 
     # Two-flag safety check
@@ -239,6 +281,49 @@ def main():
 
     # Find candidates
     db = SessionLocal()
+
+    # --- DB IDENTITY GUARD ---
+    # SessionLocal() resolves its URL from the app config / .env, which may
+    # differ from an exported DATABASE_URL depending on load order. Rather than
+    # trust that, confirm the ACTUAL connected server and refuse to run unless
+    # it matches the environment the operator explicitly named via --expect-env.
+    # This is the last line of defense against running a prod-writing backfill
+    # against the wrong database.
+    _ENV_FINGERPRINTS = {
+        "staging": {"addr": "10.195.138.142"},
+        "prod": {"addr": "10.169.100.153"},
+    }
+    try:
+        server_addr = str(db.execute(text("SELECT inet_server_addr()")).scalar())
+        current_db = db.execute(text("SELECT current_database()")).scalar()
+        row_count = db.execute(text("SELECT count(*) FROM pfas_results")).scalar()
+    except Exception as e:
+        db.close()
+        sys.exit(f"ERROR confirming DB identity: {e}")
+
+    print("=== DB IDENTITY ===")
+    print(f"  expect-env : {args.expect_env}")
+    print(f"  server addr: {server_addr}")
+    print(f"  database   : {current_db}")
+    print(f"  pfas_results: {row_count}")
+    print("===================")
+    logger.info(
+        "DB identity: expect=%s addr=%s db=%s rows=%s",
+        args.expect_env, server_addr, current_db, row_count,
+    )
+
+    expected_addr = _ENV_FINGERPRINTS[args.expect_env]["addr"]
+    if server_addr != expected_addr:
+        db.close()
+        sys.exit(
+            f"ABORT: connected server {server_addr} does NOT match "
+            f"--expect-env {args.expect_env} (expected {expected_addr}).\n"
+            f"       The DB connection is not the environment you named. "
+            f"Refusing to run.\n"
+            f"       Check your DATABASE_URL / .env and try again."
+        )
+    print(f"  identity OK -- confirmed {args.expect_env}. Proceeding.\n")
+
     try:
         all_candidates = _find_pattern_a_candidates(db, doc_id_filter=args.doc_id)
     except Exception as e:
