@@ -5,6 +5,7 @@ import logging
 import secrets
 import threading
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -12,7 +13,12 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.config import settings
+from app.config import (
+    DISCREPANCY_TOLERANCE_PPT,
+    MCL,
+    classify_result_status,
+    settings,
+)
 from app.database import SessionLocal, get_db
 from app.models.results import PfasResult, SourceDiscoveryResult
 from app.models.scraper import ScrapeRun, SeenDocument
@@ -160,6 +166,32 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)):
         .all()
     )
 
+    # --- PFAS6 discrepancy review queue (query-time; no migration) ---
+    # Lab-math class: stored pfas6_sum (the lab's certified total) disagrees
+    # with the raw sum of the six component columns by more than tolerance.
+    # Hidden records are excluded, so the HIDE action removes the row.
+    _component_cols = ("pfos", "pfoa", "pfhxs", "pfna", "pfhpa", "pfda")
+    _tol = Decimal(str(DISCREPANCY_TOLERANCE_PPT))
+    _disc_candidates = (
+        db.query(PfasResult)
+        .filter(
+            PfasResult.pfas6_sum.isnot(None),
+            PfasResult.pfas6_sum > 0,
+            PfasResult.hidden == False,  # noqa: E712
+        )
+        .all()
+    )
+    discrepancy_queue = []
+    for _r in _disc_candidates:
+        _comp_sum = sum(
+            (getattr(_r, _c) if getattr(_r, _c) is not None else Decimal(0))
+            for _c in _component_cols
+        )
+        _diff = _r.pfas6_sum - _comp_sum
+        if abs(_diff) > _tol:
+            discrepancy_queue.append({"r": _r, "comp_sum": _comp_sum, "diff": _diff})
+    discrepancy_queue.sort(key=lambda d: abs(d["diff"]), reverse=True)
+
     # --- Subscriber summary ---
     total_confirmed = (
         db.query(func.count(User.id))
@@ -196,6 +228,8 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)):
         "lf_errors": lf_errors,
         "sd_errors": sd_errors,
         "geocode_queue": geocode_queue,
+        "discrepancy_queue": discrepancy_queue,
+        "discrepancy_tol": DISCREPANCY_TOLERANCE_PPT,
         "total_confirmed": total_confirmed,
         "with_mobile": with_mobile,
         "hood_counts": hood_counts,
@@ -239,6 +273,7 @@ def hide_result(
     request: Request,
     result_id: str = Form(...),
     source: str = Form(...),
+    redirect_anchor: str = Form("hide-unhide"),
     db: Session = Depends(get_db),
 ):
     if not _is_authenticated(request):
@@ -254,7 +289,7 @@ def hide_result(
         db.commit()
         logger.info("Hidden %s result %s", source, result_id)
 
-    return RedirectResponse(url="/admin#hide-unhide", status_code=303)
+    return RedirectResponse(url=f"/admin#{redirect_anchor}", status_code=303)
 
 
 @router.post("/unhide-result")
@@ -278,6 +313,40 @@ def unhide_result(
         logger.info("Unhidden %s result %s", source, result_id)
 
     return RedirectResponse(url="/admin#hide-unhide", status_code=303)
+
+
+# --- PFAS6 override (discrepancy review) ---
+
+@router.post("/override-pfas6")
+def override_pfas6(
+    request: Request,
+    result_id: str = Form(...),
+    new_value: float = Form(...),
+    db: Session = Depends(get_db),
+):
+    """Set the stored pfas6_sum to an admin-verified value (from the PDF).
+
+    Recomputes result_status via the same classifier the parser uses, and
+    pass_fail from the MCL. Deliberately does NOT touch notified_at and does
+    NOT enqueue any notification: admin corrections are silent.
+    """
+    if not _is_authenticated(request):
+        return RedirectResponse(url="/admin/login", status_code=303)
+
+    record = db.query(PfasResult).filter(PfasResult.id == result_id).first()
+    if record and new_value >= 0:
+        old_sum, old_status = record.pfas6_sum, record.result_status
+        record.pfas6_sum = Decimal(str(new_value))
+        record.result_status = classify_result_status(new_value)
+        record.pass_fail = "PASS" if new_value <= MCL else "FAIL"
+        db.commit()
+        logger.info(
+            "PFAS6 override: doc %s pfas6 %s -> %s, status %s -> %s",
+            record.laserfiche_doc_id, old_sum, new_value,
+            old_status, record.result_status,
+        )
+
+    return RedirectResponse(url="/admin#discrepancy-queue", status_code=303)
 
 
 # --- Manual scraper triggers ---

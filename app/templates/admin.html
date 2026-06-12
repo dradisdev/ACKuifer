@@ -242,6 +242,67 @@
       {% endif %}
     </div>
 
+    <!-- ===== PFAS6 DISCREPANCY REVIEW ===== -->
+    <h2 id="discrepancy-queue">PFAS6 Discrepancy Review ({{ discrepancy_queue | length }})</h2>
+    <div class="section">
+      <p style="font-size:0.85rem;color:#718096;margin-bottom:0.8rem;">
+        Records where the stored PFAS6 total differs from the raw sum of the six components by more than {{ discrepancy_tol }} ppt.
+        The stored value is usually the lab's certified total — small gaps from rounding or sub-MRL/J-qualified exclusions are normal.
+        Verify against the PDF; <strong>Set</strong> corrects the stored total (recomputes status, sends no notifications), <strong>Hide</strong> removes the record from public display.
+      </p>
+      {% if discrepancy_queue %}
+      <table>
+        <thead>
+          <tr>
+            <th>Doc</th>
+            <th>Street</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>J</th>
+            <th>Stored</th>
+            <th>Raw Sum</th>
+            <th>Diff</th>
+            <th>Override (ppt)</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for d in discrepancy_queue %}
+        <tr>
+          <td><a href="https://portal.laserfiche.com/Portal/DocView.aspx?id={{ d.r.laserfiche_doc_id }}&repo=r-ec7bdbfe" target="_blank" rel="noopener" class="mono">{{ d.r.laserfiche_doc_id }}</a></td>
+          <td>{{ d.r.street_name or '—' }}</td>
+          <td>{{ d.r.sample_date.strftime('%Y-%m-%d') if d.r.sample_date else '' }}</td>
+          <td>{{ d.r.result_status }}</td>
+          <td>{{ 'J' if d.r.j_qualifier_present else '' }}</td>
+          <td class="mono">{{ d.r.pfas6_sum }}</td>
+          <td class="mono">{{ d.comp_sum }}</td>
+          <td class="mono">{{ '%+.2f' | format(d.diff | float) }}</td>
+          <td>
+            <form method="post" action="/admin/override-pfas6" class="form-inline" style="min-width:160px;">
+              <input type="hidden" name="result_id" value="{{ d.r.id }}">
+              <div class="form-row">
+                <input type="number" name="new_value" step="any" min="0" placeholder="ppt" style="width:80px;" required>
+              </div>
+              <button type="submit" class="btn btn-primary btn-sm">Set</button>
+            </form>
+          </td>
+          <td>
+            <form method="post" action="/admin/hide-result" onsubmit="return confirm('Hide doc {{ d.r.laserfiche_doc_id }} from public display?');">
+              <input type="hidden" name="result_id" value="{{ d.r.id }}">
+              <input type="hidden" name="source" value="laserfiche">
+              <input type="hidden" name="redirect_anchor" value="discrepancy-queue">
+              <button type="submit" class="btn btn-danger btn-sm">Hide</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="empty-state">No discrepancies above tolerance</p>
+      {% endif %}
+    </div>
+
     <!-- ===== SUBSCRIBER SUMMARY ===== -->
     <h2>Subscribers</h2>
     <div class="grid-2">

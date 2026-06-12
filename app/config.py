@@ -71,6 +71,12 @@ RETENTION_DAYS_AFTER_UNSUBSCRIBE: int = 30
 # Days within which same-street results are treated as retests in digest
 RETEST_WINDOW_DAYS: int = 60
 
+# Admin PFAS6 discrepancy review: flag records where
+# abs(stored pfas6_sum - raw sum of the six components) exceeds this (ppt).
+# 0.05 suppresses floating-point dust and trivial rounding; certified-total
+# vs raw-sum gaps above this are listed for review against the source PDF.
+DISCREPANCY_TOLERANCE_PPT: float = 0.05
+
 # Fallback neighborhood for unresolved parcels
 FALLBACK_NEIGHBORHOOD: str = "Nantucket (Island-wide)"
 
