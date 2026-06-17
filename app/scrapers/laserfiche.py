@@ -14,7 +14,7 @@ Traversal hierarchy per PRD Section 4.1:
 
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 
@@ -577,6 +577,58 @@ def _parse_date(raw: str) -> Optional[datetime]:
 # Main scraper
 # =============================================================================
 
+# Max time a run may go without progress before the reaper declares it dead.
+# A live run heartbeats every parcel (minutes apart); only a dead process
+# (deploy restart, container kill, internal hang) goes silent this long.
+# Judged on SILENCE, not total runtime, so a legitimately long full-island
+# run is never reaped as long as it keeps heartbeating.
+REAPER_NO_PROGRESS_HOURS = 3
+
+
+def reap_stale_runs(source: str = "laserfiche") -> int:
+    """Mark abandoned 'running' rows as 'error'.
+
+    A run is abandoned if its last-known-alive time (last_progress_at, or
+    started_at when the heartbeat is NULL — e.g. rows predating the heartbeat
+    column) is older than REAPER_NO_PROGRESS_HOURS. Such a process died without
+    reaching the finalize block (deploy restart, container kill, or hang).
+
+    Silent by design: logs and marks 'error'; sends no alert. Returns the
+    number of rows reaped. Safe to call repeatedly (idempotent — once a row is
+    'error' it no longer matches the 'running' filter).
+    """
+    from sqlalchemy import func as _func
+
+    cutoff = datetime.utcnow() - timedelta(hours=REAPER_NO_PROGRESS_HOURS)
+    reaped = 0
+    with SessionLocal() as db:
+        stale = (
+            db.query(ScrapeRun)
+            .filter(
+                ScrapeRun.source == source,
+                ScrapeRun.status == "running",
+                _func.coalesce(ScrapeRun.last_progress_at, ScrapeRun.started_at) < cutoff,
+            )
+            .all()
+        )
+        for run in stale:
+            last_alive = run.last_progress_at or run.started_at
+            run.status = "error"
+            run.completed_at = datetime.utcnow()
+            run.error_message = (
+                f"reaped: no terminal status — process died "
+                f"(deploy restart or hang). last alive {last_alive} "
+                f"(> {REAPER_NO_PROGRESS_HOURS}h before reap)."
+            )
+            reaped += 1
+            logger.warning(
+                "Reaped stale %s run %s (last alive %s)",
+                source, run.id, last_alive,
+            )
+        db.commit()
+    return reaped
+
+
 def run_laserfiche_scraper(
     headless: bool = True,
     map_filter: Optional[str] = None,
@@ -589,14 +641,34 @@ def run_laserfiche_scraper(
 
     Returns:
         Summary dict with run stats.
-    """
+   """
+    # Reclaim any abandoned 'running' rows from prior runs that died without
+    # finalizing (deploy restart, container kill, hang) before starting a new run.
+    reap_stale_runs("laserfiche")
+
     # Create scrape run record (short-lived session)
     with SessionLocal() as db:
-        run = ScrapeRun(source="laserfiche", status="running")
+        run = ScrapeRun(
+            source="laserfiche",
+            status="running",
+            last_progress_at=datetime.utcnow(),
+        )
         db.add(run)
         db.commit()
         db.refresh(run)
         run_id = str(run.id)
+        
+    def _heartbeat():
+        """Bump last_progress_at so the reaper can tell this run is alive.
+        Best-effort: a heartbeat failure must never abort a scrape."""
+        try:
+            with SessionLocal() as hb_db:
+                hb_run = hb_db.query(ScrapeRun).get(run_id)
+                if hb_run:
+                    hb_run.last_progress_at = datetime.utcnow()
+                    hb_db.commit()
+        except Exception:
+            logger.debug("heartbeat update failed (non-fatal)", exc_info=True)
 
     stats = {
         "new_docs_found": 0,
@@ -659,6 +731,7 @@ def run_laserfiche_scraper(
                     logger.info("    Map %s: %d parcel folders", map_number, len(parcel_folders))
 
                     for parcel_folder in parcel_folders:
+                        _heartbeat()
                         _process_parcel(
                             page, stats,
                             map_number=map_number,
