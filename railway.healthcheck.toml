@@ -1,0 +1,7 @@
+[build]
+builder = "nixpacks"
+buildCommand = ""
+
+[deploy]
+startCommand = "python -m app.scrapers.run_healthcheck"
+restartPolicyType = "never"

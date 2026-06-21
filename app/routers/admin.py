@@ -105,44 +105,18 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse(url="/admin/login", status_code=303)
 
     now = datetime.now(timezone.utc)
-    deadmans_cutoff = now - timedelta(days=settings.deadmans_window_days)
 
-    # --- Scraper status ---
-    def _scraper_status(source: str) -> dict:
-        last_success = (
-            db.query(ScrapeRun)
-            .filter(ScrapeRun.source == source, ScrapeRun.status == "success")
-            .order_by(ScrapeRun.completed_at.desc())
-            .first()
-        )
-        last_run = (
-            db.query(ScrapeRun)
-            .filter(ScrapeRun.source == source)
-            .order_by(ScrapeRun.started_at.desc())
-            .first()
-        )
-        currently_running = (
-            db.query(ScrapeRun)
-            .filter(ScrapeRun.source == source, ScrapeRun.status == "running")
-            .first()
-        )
-        healthy = bool(
-            last_success
-            and last_success.completed_at
-            and last_success.completed_at >= deadmans_cutoff
-        )
-        return {
-            "last_success": last_success,
-            "last_run": last_run,
-            "currently_running": currently_running,
-            "healthy": healthy,
-        }
+    # --- Scraper status (shared logic: see app/monitoring/health.py) ---
+    # Both this dashboard and the independent monitor cron call the SAME
+    # functions, so the page-load path and the scheduled path can never drift,
+    # and they share one durable cooldown so they cannot double-send.
+    from app.monitoring.health import check_and_alert, compute_scraper_status
 
-    lf_status = _scraper_status("laserfiche")
-    sd_status = _scraper_status("massdep")
+    lf_status = compute_scraper_status(db, "laserfiche", now=now)
+    sd_status = compute_scraper_status(db, "massdep", now=now)
 
-    # --- Dead man's switch email ---
-    _check_deadmans_alerts(lf_status, sd_status, now)
+    # --- Dead man's switch email (durable, cross-process dedup) ---
+    check_and_alert(db, {"laserfiche": lf_status, "massdep": sd_status}, now=now)
 
     # --- Parse error queue ---
     lf_errors = (
@@ -401,9 +375,15 @@ def save_config(request: Request, db: Session = Depends(get_db)):
     loop.close()
 
     from app.models.site_config import SiteConfig
+    from app.monitoring.health import is_reserved_config_key
 
     now = datetime.now(timezone.utc)
     for key, value in form_data.items():
+        # Internal bookkeeping keys (e.g. deadmans dedup timestamps) share this
+        # table but must never be editable via the operator content form.
+        if is_reserved_config_key(key):
+            logger.warning("Refused to overwrite reserved site_config key via form: %s", key)
+            continue
         existing = db.query(SiteConfig).filter(SiteConfig.key == key).first()
         if existing:
             existing.value = str(value)
@@ -413,32 +393,3 @@ def save_config(request: Request, db: Session = Depends(get_db)):
     db.commit()
 
     return RedirectResponse(url="/admin#editable-content", status_code=303)
-
-
-# --- Dead man's switch alert logic ---
-
-_last_deadmans_alert: dict[str, datetime] = {}  # source -> last alert sent time
-
-
-def _check_deadmans_alerts(lf_status: dict, sd_status: dict, now: datetime):
-    """Send dead man's switch alerts if either scraper is overdue."""
-    if not settings.operator_email:
-        return
-
-    for source, status in [("laserfiche", lf_status), ("massdep", sd_status)]:
-        if status["healthy"]:
-            continue
-        # Don't send more than once per day
-        last_sent = _last_deadmans_alert.get(source)
-        if last_sent and (now - last_sent) < timedelta(hours=24):
-            continue
-
-        last_run = status["last_success"]
-        last_run_at = last_run.completed_at if last_run else None
-
-        try:
-            from app.notifications.email import send_deadmans_alert
-            send_deadmans_alert(source, last_run_at)
-            _last_deadmans_alert[source] = now
-        except Exception:
-            logger.exception("Failed to send dead man's switch alert for %s", source)
