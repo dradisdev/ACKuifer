@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     # Operator
     operator_email: str = ""
     deadmans_window_days: int = 20
+    # Master switch for dead man's switch alerting. Default True (fail-safe: a
+    # forgotten env var still alerts). Set DEADMANS_ALERTING_ENABLED=false per
+    # environment (e.g. staging, whose scrape cron is off) to silence alerts
+    # there without a code change.
+    deadmans_alerting_enabled: bool = True
 
     # Scraper schedules
     laserfiche_cron_schedule: str = "0 8 1,15 * *"
