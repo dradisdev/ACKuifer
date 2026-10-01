@@ -14,7 +14,7 @@ python-multipart>=0.0.9       # Form handling in FastAPI
 # ============================================================
 # DATABASE
 # ============================================================
-sqlalchemy>=2.0.0
+sqlalchemy>=2.0.0,<2.1        # 2.1 defaults postgresql:// to psycopg (v3), not psycopg2
 psycopg2-binary>=2.9.9        # PostgreSQL adapter
 alembic>=1.13.0               # Database migrations
 
