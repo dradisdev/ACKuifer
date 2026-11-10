@@ -55,6 +55,19 @@ class Settings(BaseSettings):
     laserfiche_repo_id: str = "r-ec7bdbfe"
     laserfiche_root_folder_id: str = "145009"
 
+    # Laserfiche crawler behaviour (D-1). The folder list is a virtual scroller
+    # that only renders rows on screen, so the crawler scrolls it to the bottom.
+    # The tall viewport is a second line of defence: more rows render per screen.
+    laserfiche_viewport_width: int = 1280
+    laserfiche_viewport_height: int = 4000
+    # Hard cap on scroll passes per folder. Map 66 (477 entries) needs ~40 at 720px.
+    laserfiche_max_scroll_passes: int = 600
+    # Stop once at the bottom and this many passes in a row found no new links.
+    laserfiche_stale_scroll_passes: int = 2
+    laserfiche_scroll_settle_ms: int = 300
+    # Extra attempts after a folder load fails or times out.
+    laserfiche_nav_retries: int = 2
+
 
 # --- Named constants (regulatory / business logic) ---
 
