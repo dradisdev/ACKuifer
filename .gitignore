@@ -103,3 +103,6 @@ BUILD_NOTES.txt
 
 # Local-only diagnostic scripts
 scripts/
+
+# Private launch plan (see CLAUDE.md "Remaining Work")
+FINISH_PLAN.md

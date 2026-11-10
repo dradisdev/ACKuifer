@@ -1,5 +1,12 @@
 # ACKuifer — Claude Code Instructions
 
+## Remaining Work
+`FINISH_PLAN.md` is the source of truth for remaining work before launch: prioritized
+items, "done when" tests, decisions, and the launch schedule. Read it before starting
+work, and update it when an item is done or a decision changes. It is private
+(gitignored, like `BUILD_NOTES.txt`) because it holds operational and security details;
+never `git add -f` it.
+
 ## Git Workflow
 Work flows dev → staging → main.
 - Feature and fix work commits to the `staging` branch (or a short-lived branch merged into `staging`). Never commit feature work directly to `main`.
