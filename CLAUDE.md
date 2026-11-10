@@ -35,6 +35,12 @@ Local dev is macOS — use python3, not python.
 - Data-mutating scripts must require `--expect-env` and verify DB identity
   (inet_server_addr + current_database + row count) before any write
 
+## Pausing
+If work stalls (blocked, waiting on something external, failing repeatedly) or the
+operator says they're stopping for the day, offer to run `/pause`. It records a
+"Resume here" checklist in `FINISH_PLAN.md`, pushes the feature branch as a backup,
+and logs the pause. `/next` resumes from that checklist.
+
 ## Session Log
-Two dated lines per completed item, appended by `/next` (newest at the bottom).
+Two dated lines per completed or paused item, appended by `/next` or `/pause` (newest at the bottom).
 This file is public: no hosts, IPs, credentials, or house numbers.
