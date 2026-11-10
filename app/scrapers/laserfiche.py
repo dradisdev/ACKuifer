@@ -109,34 +109,86 @@ def _parse_parcel_folder_name(parent_map_number: str, folder_name: str) -> tuple
 # Playwright navigation helpers (from prototype)
 # =============================================================================
 
+class PortalBlockedError(RuntimeError):
+    """The portal's bot check (Cloudflare) kept refusing us; stop the run."""
+
+
+# Markers of the Cloudflare "Performing security verification" page that the
+# portal serves instead of the folder when it rate-limits a client.
+_BLOCK_STATUSES = (403, 429)
+_BLOCK_TEXT_MARKERS = ("Performing security verification", "challenges.cloudflare.com")
+
+# Consecutive folders that stayed blocked after every retry, across the run.
+# Reset by reset_block_state() at the start of each run.
+_block_state = {"consecutive": 0}
+
+
+def reset_block_state() -> None:
+    _block_state["consecutive"] = 0
+
+
+def _is_blocked(page: Page, response) -> bool:
+    if response is not None and response.status in _BLOCK_STATUSES:
+        return True
+    try:
+        html = page.content()
+    except Exception:
+        return False
+    return any(marker in html for marker in _BLOCK_TEXT_MARKERS)
+
+
 def _navigate_and_wait(
     page: Page,
     folder_id: str,
     label: str = "",
     failures: Optional[list] = None,
 ) -> bool:
-    """Open a folder, retrying on failure or timeout.
+    """Open a folder, retrying on failure, timeout or bot check.
 
-    If every attempt fails, the folder is logged and appended to `failures`
-    (when given) so the run can report it instead of skipping it silently.
+    Pauses before every load to keep the request rate polite. A bot-check
+    page is never treated as an empty folder: we back off and retry, and if
+    it persists the folder is recorded as blocked. After too many blocked
+    folders in a row, PortalBlockedError stops the run so it can't finish
+    as a hollow "success". Folders that still fail are appended to
+    `failures` (when given) so the run reports them instead of skipping
+    them silently.
     """
     attempts = 1 + settings.laserfiche_nav_retries
-    last_error = None
+    last_error = "unknown"
+    blocked = False
     for attempt in range(1, attempts + 1):
+        page.wait_for_timeout(settings.laserfiche_folder_delay_ms)
         try:
-            page.goto(_browse_url(folder_id), timeout=30000)
-            page.wait_for_load_state("networkidle", timeout=15000)
-            page.wait_for_timeout(2000)
-            return True
+            response = page.goto(_browse_url(folder_id), timeout=30000)
+            blocked = _is_blocked(page, response)
+            if not blocked:
+                page.wait_for_load_state("networkidle", timeout=15000)
+                page.wait_for_timeout(2000)
+                blocked = _is_blocked(page, None)
+            if not blocked:
+                _block_state["consecutive"] = 0
+                return True
+            last_error = "blocked by portal bot check (Cloudflare)"
         except Exception as e:
-            last_error = e
-            logger.warning(
-                "Error navigating to folder %s (%s), attempt %d/%d: %s",
-                folder_id, label or "?", attempt, attempts, e,
-            )
+            last_error = str(e)
+            blocked = False
+        logger.warning(
+            "Error navigating to folder %s (%s), attempt %d/%d: %s",
+            folder_id, label or "?", attempt, attempts, last_error,
+        )
+        if blocked and attempt < attempts:
+            page.wait_for_timeout(settings.laserfiche_block_backoff_seconds * 1000)
+
     logger.error("Giving up on folder %s (%s) after %d attempts", folder_id, label or "?", attempts)
     if failures is not None:
-        failures.append({"id": folder_id, "name": label, "error": str(last_error)[:200]})
+        failures.append({"id": folder_id, "name": label, "error": last_error[:200]})
+    if blocked:
+        _block_state["consecutive"] += 1
+        if _block_state["consecutive"] >= settings.laserfiche_max_consecutive_blocks:
+            raise PortalBlockedError(
+                f"Portal bot check blocked {_block_state['consecutive']} folders in a row "
+                f"(last: {label or folder_id}); stopping the run"
+            )
     return False
 
 
@@ -703,6 +755,7 @@ def run_laserfiche_scraper(
     # Reclaim any abandoned 'running' rows from prior runs that died without
     # finalizing (deploy restart, container kill, hang) before starting a new run.
     reap_stale_runs("laserfiche")
+    reset_block_state()
 
     # Create scrape run record (short-lived session)
     with SessionLocal() as db:

@@ -67,6 +67,14 @@ class Settings(BaseSettings):
     laserfiche_scroll_settle_ms: int = 300
     # Extra attempts after a folder load fails or times out.
     laserfiche_nav_retries: int = 2
+    # Pause before every folder load, to stay under the portal's rate limit
+    # (Cloudflare bot check, first hit 2026-11-10). Each 1000 ms adds roughly
+    # 7 hours to a full run (~26k folder loads), so keep it small.
+    laserfiche_folder_delay_ms: int = 500
+    # Wait after a bot-check page before retrying the same folder.
+    laserfiche_block_backoff_seconds: int = 120
+    # Stop the run (status "error") after this many folders in a row stay blocked.
+    laserfiche_max_consecutive_blocks: int = 3
 
 
 # --- Named constants (regulatory / business logic) ---

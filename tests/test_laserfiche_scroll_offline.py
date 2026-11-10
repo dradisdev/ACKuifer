@@ -109,6 +109,50 @@ def main() -> int:
         check("failed nav retried once", calls["n"] == 2, f"calls={calls['n']}")
         check("failed nav recorded", failed and failed[0]["id"] == "999" and failed[0]["name"] == "Map 79")
 
+        # Bot check: never treated as an empty folder; backs off, records, then stops the run.
+        lf.settings.laserfiche_folder_delay_ms = 0
+        lf.settings.laserfiche_block_backoff_seconds = 0
+        lf.settings.laserfiche_max_consecutive_blocks = 2
+        lf.reset_block_state()
+
+        class _Resp:
+            def __init__(self, status):
+                self.status = status
+
+        def challenge_goto(*a, **k):
+            page.set_content("<html><body>Performing security verification</body></html>")
+            return _Resp(429)
+
+        def challenge_200_goto(*a, **k):
+            page.set_content("<html><body>Performing security verification "
+                             "<iframe src='about:blank' data-x='challenges.cloudflare.com'></iframe></body></html>")
+            return _Resp(200)
+
+        def good_goto(*a, **k):
+            page.set_content(fake_portal(3, "p-virtualscroller"))
+            return _Resp(200)
+
+        failed = []
+        page.goto = challenge_goto
+        ok = lf._navigate_and_wait(page, "1", "Map 21", failed)
+        check("blocked folder returns False", ok is False)
+        check("blocked folder recorded as bot check", failed and "bot check" in failed[0]["error"])
+
+        page.goto = good_goto
+        check("good folder after a block loads", lf._navigate_and_wait(page, "2", "Map 22", failed) is True)
+        check("success resets block counter", lf._block_state["consecutive"] == 0)
+
+        page.goto = challenge_200_goto
+        lf._navigate_and_wait(page, "3", "Map 23", failed)
+        check("challenge page with HTTP 200 detected", "bot check" in failed[-1]["error"])
+        try:
+            lf._navigate_and_wait(page, "4", "Map 24", failed)
+            raised = False
+        except lf.PortalBlockedError:
+            raised = True
+        check("2 blocked folders in a row stop the run", raised)
+        page.goto = real_goto
+
         browser.close()
 
     print(f"\n{len(failures)} failure(s)" if failures else "\nALL PASS")
