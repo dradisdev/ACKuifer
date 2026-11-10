@@ -7,14 +7,20 @@ Work the next item from the launch plan. Stop at each **gate** and wait for the 
 
 ## 1. Read
 - Read `FINISH_PLAN.md` (private and gitignored, never `git add` it) and the `## Session Log` section of `CLAUDE.md`.
-- Run `git status` and `git branch --show-current`. If the tree isn't clean, stop and say what's uncommitted.
+- Run `git status` and `git branch --show-current`. If the tree isn't clean, stop and say what's uncommitted. (Being on a paused item's feature branch is fine.)
 
 ## 2. Pick one item
 - If an item ID was given (`$ARGUMENTS`), use it.
+- Otherwise, an open item with a "Resume here" checklist comes first.
 - Otherwise pick the highest-priority **open** item. An item is done when its heading has `✅ DONE`.
   - Follow "Launch sequence" order first. Then go through MUST-HAVE in order (Data integrity → API keys and secrets → Analytics → Working site and feedback). NICE-TO-HAVE comes only after every MUST-HAVE is done.
   - Skip items whose prerequisites aren't done. Skip anything that is a production action, such as D-3's catch-up run or a promotion to `main`. Name it as the next manual step instead.
 - Tell the operator which item it is and why, **in one sentence**.
+- **Resuming a paused item:** if the item has a **"Resume here"** checklist (written by `/pause`), resume it before anything else, unless the operator named a different item.
+  - Say so in the same sentence, with the date of the "Where it stands" block.
+  - Skip step 3 (the plan was approved before the pause) and the branch creation in step 4: use the branch the checklist names.
+  - Present the checklist as it stands and ask "start at step 1?" (this is the gate). Then follow it in order, stopping at the first step whose result isn't good.
+  - When the checklist is finished, continue `/next` from the step it points to.
 
 ## 3. Plan → gate
 - Propose a short plan: at most 6 bullets, the files you'll touch, and how the item's **Done when** test will be shown.
@@ -35,7 +41,7 @@ Work the next item from the launch plan. Stop at each **gate** and wait for the 
 - **Gate:** wait for the operator to confirm that staging looks good. If they report a problem, fix it on the branch and repeat steps 4–5.
 
 ## 6. Close out (only after the operator confirms)
-- In `FINISH_PLAN.md`, add ` ✅ DONE YYYY-MM-DD` to the item's heading. Put a short evidence line under its **Done when** with what was checked, on staging, and the commit hash. If only the staging part is done and a production step remains, say so in the evidence line instead of marking it done.
+- In `FINISH_PLAN.md`, add ` ✅ DONE YYYY-MM-DD` to the item's heading. Delete the item's "Resume here" checklist, if any (keep its evidence lines). Put a short evidence line under its **Done when** with what was checked, on staging, and the commit hash. If only the staging part is done and a production step remains, say so in the evidence line instead of marking it done.
 - In `CLAUDE.md`, append to `## Session Log` (newest at the bottom), exactly two lines:
   ```
   - YYYY-MM-DD — <item ID>: <what changed, one line>
