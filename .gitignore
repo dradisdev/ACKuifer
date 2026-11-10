@@ -93,7 +93,9 @@ npm-debug.log*
 # Raw downloaded PDFs from MassDEP (transient, not committed)
 prototype/downloads/
 prototype/*.pdf
-.claude/
+# Claude Code: local settings/worktrees stay private; shared slash commands are tracked
+.claude/*
+!.claude/commands/
 prototype/pfas_monitor/pdfs/
 ~$*
 BUILD_NOTES.txt

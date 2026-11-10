@@ -34,3 +34,7 @@ Local dev is macOS — use python3, not python.
 - Run existing tests before committing if tests exist
 - Data-mutating scripts must require `--expect-env` and verify DB identity
   (inet_server_addr + current_database + row count) before any write
+
+## Session Log
+Two dated lines per completed item, appended by `/next` (newest at the bottom).
+This file is public: no hosts, IPs, credentials, or house numbers.
