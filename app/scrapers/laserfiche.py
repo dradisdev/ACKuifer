@@ -232,12 +232,16 @@ async (redrawTimeoutMs) => {
 """
 
 _ENTRY_COUNT_RE = re.compile(r"\b(\d[\d,]*)\s+Entr(?:y|ies)\b")
+# An empty folder shows this in the table instead of an "N Entries" figure.
+_EMPTY_FOLDER_RE = re.compile(r"\bNo results found\b", re.IGNORECASE)
 
 
 def _parse_entry_count(text: str) -> Optional[int]:
-    """Parse the portal's "N Entries" figure from page text."""
+    """Parse the portal's "N Entries" figure from page text (0 for an empty folder)."""
     match = _ENTRY_COUNT_RE.search(text or "")
-    return int(match.group(1).replace(",", "")) if match else None
+    if match:
+        return int(match.group(1).replace(",", ""))
+    return 0 if _EMPTY_FOLDER_RE.search(text or "") else None
 
 
 def _read_entry_count(page: Page) -> Optional[int]:

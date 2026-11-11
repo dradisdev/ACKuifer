@@ -67,6 +67,9 @@ def main() -> int:
     check("parse '1 Entry'", lf._parse_entry_count("1 Entry") == 1)
     check("parse '6,519 Entries'", lf._parse_entry_count("6,519 Entries") == 6519)
     check("parse missing -> None", lf._parse_entry_count("no count here") is None)
+    # Empty folder, as the portal showed it for Map 21 parcel "21 3" Reports on 2026-11-11.
+    check("parse empty folder -> 0", lf._parse_entry_count(
+        "Reports Table finished loading Name Page count Template name No results found Reports") == 0)
 
     # Speed up the scroll loop for the test; behaviour is unchanged.
     lf.settings.laserfiche_scroll_settle_ms = 20
