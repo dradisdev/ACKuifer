@@ -44,3 +44,5 @@ and logs the pause. `/next` resumes from that checklist.
 ## Session Log
 Two dated lines per completed or paused item, appended by `/next` or `/pause` (newest at the bottom).
 This file is public: no hosts, IPs, credentials, or house numbers.
+- 2026-11-10 — D-1: paused — crawler listing fix committed and tested; live census blocked by the portal's bot check
+  Resume: see "Resume here" under D-1 in FINISH_PLAN.md

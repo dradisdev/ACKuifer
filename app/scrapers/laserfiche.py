@@ -109,65 +109,187 @@ def _parse_parcel_folder_name(parent_map_number: str, folder_name: str) -> tuple
 # Playwright navigation helpers (from prototype)
 # =============================================================================
 
-def _navigate_and_wait(page: Page, folder_id: str) -> bool:
-    try:
-        page.goto(_browse_url(folder_id), timeout=30000)
-        page.wait_for_load_state("networkidle", timeout=15000)
-        page.wait_for_timeout(2000)
+class PortalBlockedError(RuntimeError):
+    """The portal's bot check (Cloudflare) kept refusing us; stop the run."""
+
+
+# Markers of the Cloudflare "Performing security verification" page that the
+# portal serves instead of the folder when it rate-limits a client.
+_BLOCK_STATUSES = (403, 429)
+_BLOCK_TEXT_MARKERS = ("Performing security verification", "challenges.cloudflare.com")
+
+# Consecutive folders that stayed blocked after every retry, across the run.
+# Reset by reset_block_state() at the start of each run.
+_block_state = {"consecutive": 0}
+
+
+def reset_block_state() -> None:
+    _block_state["consecutive"] = 0
+
+
+def _is_blocked(page: Page, response) -> bool:
+    if response is not None and response.status in _BLOCK_STATUSES:
         return True
-    except Exception as e:
-        logger.warning("Error navigating to folder %s: %s", folder_id, e)
+    try:
+        html = page.content()
+    except Exception:
         return False
+    return any(marker in html for marker in _BLOCK_TEXT_MARKERS)
 
 
-def _extract_all_links_with_scroll(page: Page, max_scrolls: int = 50) -> list[dict]:
-    """Scroll through virtualized list and extract all browse/doc links."""
-    all_items = {}
+def _navigate_and_wait(
+    page: Page,
+    folder_id: str,
+    label: str = "",
+    failures: Optional[list] = None,
+) -> bool:
+    """Open a folder, retrying on failure, timeout or bot check.
 
-    scroll_script = """
-    () => {
-        const candidates = document.querySelectorAll(
-            'div, section, main, [class*="list"], [class*="content"], '
-            + '[class*="scroll"], [class*="grid"]'
-        );
-        for (const el of candidates) {
-            if (el.scrollHeight > el.clientHeight + 50) {
-                el.scrollTop += 300;
-                return true;
-            }
-        }
-        return false;
-    }
+    Pauses before every load to keep the request rate polite. A bot-check
+    page is never treated as an empty folder: we back off and retry, and if
+    it persists the folder is recorded as blocked. After too many blocked
+    folders in a row, PortalBlockedError stops the run so it can't finish
+    as a hollow "success". Folders that still fail are appended to
+    `failures` (when given) so the run reports them instead of skipping
+    them silently.
     """
+    attempts = 1 + settings.laserfiche_nav_retries
+    last_error = "unknown"
+    blocked = False
+    for attempt in range(1, attempts + 1):
+        page.wait_for_timeout(settings.laserfiche_folder_delay_ms)
+        try:
+            response = page.goto(_browse_url(folder_id), timeout=30000)
+            blocked = _is_blocked(page, response)
+            if not blocked:
+                page.wait_for_load_state("networkidle", timeout=15000)
+                page.wait_for_timeout(2000)
+                blocked = _is_blocked(page, None)
+            if not blocked:
+                _block_state["consecutive"] = 0
+                return True
+            last_error = "blocked by portal bot check (Cloudflare)"
+        except Exception as e:
+            last_error = str(e)
+            blocked = False
+        logger.warning(
+            "Error navigating to folder %s (%s), attempt %d/%d: %s",
+            folder_id, label or "?", attempt, attempts, last_error,
+        )
+        if blocked and attempt < attempts:
+            page.wait_for_timeout(settings.laserfiche_block_backoff_seconds * 1000)
 
-    for _ in range(max_scrolls):
-        for link in page.query_selector_all('a[href*="Browse"]'):
+    logger.error("Giving up on folder %s (%s) after %d attempts", folder_id, label or "?", attempts)
+    if failures is not None:
+        failures.append({"id": folder_id, "name": label, "error": last_error[:200]})
+    if blocked:
+        _block_state["consecutive"] += 1
+        if _block_state["consecutive"] >= settings.laserfiche_max_consecutive_blocks:
+            raise PortalBlockedError(
+                f"Portal bot check blocked {_block_state['consecutive']} folders in a row "
+                f"(last: {label or folder_id}); stopping the run"
+            )
+    return False
+
+
+# Scroll the folder list one screen down. The list is a PrimeNG virtual
+# scroller (.p-virtualscroller) that renders only the rows on screen. Before
+# the fix, the crawler scrolled the first scrollable-looking div, which since
+# July 2026 is an overflow:hidden wrapper (DIV.v-outer), so the list never moved
+# and only the first screen (~30 rows) was collected.
+_SCROLL_LIST_JS = """
+async (redrawTimeoutMs) => {
+    // Wait until the list has redrawn after a scroll, so the next read sees the
+    // new rows rather than the old ones (otherwise a screen of rows is skipped).
+    // The timeout keeps this from hanging if animation frames are throttled.
+    const redrawn = () => new Promise((resolve) => {
+        const t = setTimeout(resolve, redrawTimeoutMs);
+        requestAnimationFrame(() => requestAnimationFrame(() => { clearTimeout(t); resolve(); }));
+    });
+    const isScrollable = (e) => {
+        const oy = getComputedStyle(e).overflowY;
+        return (oy === 'auto' || oy === 'scroll') && e.scrollHeight > e.clientHeight + 1;
+    };
+    let el = null;
+    for (const v of document.querySelectorAll('.p-virtualscroller')) {
+        if (isScrollable(v)) { el = v; break; }
+    }
+    if (!el) {
+        // Fallback: nearest scrollable ancestor of a folder/document link.
+        const link = document.querySelector('a[href*="Browse"], a[href*="DocView"]');
+        let e = link ? link.parentElement : null;
+        while (e && !isScrollable(e)) e = e.parentElement;
+        el = e;
+    }
+    if (!el) return {scrollable: false, atBottom: true};
+    el.scrollTop = el.scrollTop + Math.max(el.clientHeight - 40, 40);
+    await redrawn();
+    return {
+        scrollable: true,
+        atBottom: el.scrollTop + el.clientHeight >= el.scrollHeight - 2,
+    };
+}
+"""
+
+_ENTRY_COUNT_RE = re.compile(r"\b(\d[\d,]*)\s+Entr(?:y|ies)\b")
+# An empty folder shows this in the table instead of an "N Entries" figure.
+_EMPTY_FOLDER_RE = re.compile(r"\bNo results found\b", re.IGNORECASE)
+
+
+def _parse_entry_count(text: str) -> Optional[int]:
+    """Parse the portal's "N Entries" figure from page text (0 for an empty folder)."""
+    match = _ENTRY_COUNT_RE.search(text or "")
+    if match:
+        return int(match.group(1).replace(",", ""))
+    return 0 if _EMPTY_FOLDER_RE.search(text or "") else None
+
+
+def _read_entry_count(page: Page) -> Optional[int]:
+    """The portal's own count of entries in the open folder, or None."""
+    try:
+        return _parse_entry_count(page.inner_text("body"))
+    except Exception:
+        return None
+
+
+def _collect_visible_links(page: Page, all_items: dict) -> None:
+    for selector, kind in (('a[href*="Browse"]', "folder"), ('a[href*="DocView"]', "document")):
+        for link in page.query_selector_all(selector):
             try:
                 href = link.get_attribute("href") or ""
                 name = link.inner_text().strip().split("\n")[0]
                 match = re.search(r"id=(\d+)", href)
                 if match and name:
-                    fid = match.group(1)
-                    if fid not in all_items:
-                        all_items[fid] = {"type": "folder", "id": fid, "name": name}
+                    item_id = match.group(1)
+                    if item_id not in all_items:
+                        all_items[item_id] = {"type": kind, "id": item_id, "name": name}
             except Exception:
                 pass
 
-        for link in page.query_selector_all('a[href*="DocView"]'):
-            try:
-                href = link.get_attribute("href") or ""
-                name = link.inner_text().strip().split("\n")[0]
-                match = re.search(r"id=(\d+)", href)
-                if match and name:
-                    did = match.group(1)
-                    if did not in all_items:
-                        all_items[did] = {"type": "document", "id": did, "name": name}
-            except Exception:
-                pass
 
-        page.evaluate(scroll_script)
-        page.wait_for_timeout(300)
+def _extract_all_links_with_scroll(page: Page, max_scrolls: Optional[int] = None) -> list[dict]:
+    """Scroll the folder's virtual list to the bottom and collect every link.
 
+    Stops when the list is at the bottom (or doesn't scroll) and the last
+    few passes found nothing new, or at the max_scrolls safety cap.
+    """
+    cap = max_scrolls or settings.laserfiche_max_scroll_passes
+    stale_limit = settings.laserfiche_stale_scroll_passes
+    all_items: dict = {}
+    stale = 0
+
+    for _ in range(cap):
+        before = len(all_items)
+        _collect_visible_links(page, all_items)
+        state = page.evaluate(_SCROLL_LIST_JS, settings.laserfiche_scroll_redraw_timeout_ms)
+        page.wait_for_timeout(settings.laserfiche_scroll_settle_ms)
+        stale = stale + 1 if len(all_items) == before else 0
+        if state.get("atBottom") and stale >= stale_limit:
+            break
+    else:
+        logger.warning("Scroll cap (%d passes) reached; listing may be incomplete", cap)
+
+    _collect_visible_links(page, all_items)
     return list(all_items.values())
 
 
@@ -645,6 +767,7 @@ def run_laserfiche_scraper(
     # Reclaim any abandoned 'running' rows from prior runs that died without
     # finalizing (deploy restart, container kill, hang) before starting a new run.
     reap_stale_runs("laserfiche")
+    reset_block_state()
 
     # Create scrape run record (short-lived session)
     with SessionLocal() as db:
@@ -676,6 +799,7 @@ def run_laserfiche_scraper(
         "parse_errors": 0,
         "skipped_seen": 0,
         "errors": [],
+        "failed_folders": [],
     }
 
     final_status = "success"
@@ -684,16 +808,21 @@ def run_laserfiche_scraper(
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=headless)
-            page = browser.new_page()
+            page = browser.new_page(viewport={
+                "width": settings.laserfiche_viewport_width,
+                "height": settings.laserfiche_viewport_height,
+            })
             page.set_default_timeout(30000)
 
             # Navigate to root: Property Files
             logger.info("Navigating to root folder %s", settings.laserfiche_root_folder_id)
-            if not _navigate_and_wait(page, settings.laserfiche_root_folder_id):
+            if not _navigate_and_wait(
+                page, settings.laserfiche_root_folder_id, "root", stats["failed_folders"]
+            ):
                 raise RuntimeError("Failed to navigate to root folder")
 
             # Get map group folders (Maps 01-09, Maps 10-19, ..., Maps 90-99)
-            root_links = _extract_all_links_with_scroll(page, max_scrolls=20)
+            root_links = _extract_all_links_with_scroll(page)
             map_groups = [
                 l for l in root_links
                 if l["type"] == "folder" and re.match(r"Maps?\s+\d", l["name"], re.IGNORECASE)
@@ -702,11 +831,11 @@ def run_laserfiche_scraper(
 
             for group in map_groups:
                 logger.info("Entering map group: %s", group["name"])
-                if not _navigate_and_wait(page, group["id"]):
+                if not _navigate_and_wait(page, group["id"], group["name"], stats["failed_folders"]):
                     continue
 
                 # Get individual map folders within this group
-                group_links = _extract_all_links_with_scroll(page, max_scrolls=30)
+                group_links = _extract_all_links_with_scroll(page)
                 map_folders = [l for l in group_links if l["type"] == "folder"]
                 logger.info("  %s contains %d map folders", group["name"], len(map_folders))
 
@@ -722,7 +851,9 @@ def run_laserfiche_scraper(
                         continue
 
                     logger.info("  Scanning Map %s (%s)", map_number, map_folder["name"])
-                    if not _navigate_and_wait(page, map_folder["id"]):
+                    if not _navigate_and_wait(
+                        page, map_folder["id"], map_folder["name"], stats["failed_folders"]
+                    ):
                         continue
 
                     # Get all parcel folders within this map
@@ -745,6 +876,13 @@ def run_laserfiche_scraper(
         logger.error("Scraper run failed: %s", e, exc_info=True)
         final_status = "error"
         error_message = str(e)[:2000]
+
+    if stats["failed_folders"]:
+        logger.error(
+            "%d folder(s) could not be opened after retries: %s",
+            len(stats["failed_folders"]),
+            ", ".join(f"{f['name']} ({f['id']})" for f in stats["failed_folders"][:50]),
+        )
 
     # Finalize scrape run record (fresh session)
     with SessionLocal() as db:
@@ -776,6 +914,7 @@ def run_laserfiche_scraper(
         "parse_errors": stats["parse_errors"],
         "skipped_seen": stats["skipped_seen"],
         "errors": stats["errors"],
+        "failed_folders": stats["failed_folders"],
     }
 
 
@@ -787,10 +926,10 @@ def _process_parcel(
     parcel_folder_id: str,
 ):
     """Process a single parcel folder: navigate to Well/Reports/year and find PFAS docs."""
-    if not _navigate_and_wait(page, parcel_folder_id):
+    if not _navigate_and_wait(page, parcel_folder_id, parcel_name, stats["failed_folders"]):
         return
 
-    prop_links = _extract_all_links_with_scroll(page, max_scrolls=10)
+    prop_links = _extract_all_links_with_scroll(page)
     well_folders = [
         l for l in prop_links
         if l["type"] == "folder" and l["name"].lower() in ("well", "wells")
@@ -799,10 +938,12 @@ def _process_parcel(
     if not well_folders:
         return
 
-    if not _navigate_and_wait(page, well_folders[0]["id"]):
+    if not _navigate_and_wait(
+        page, well_folders[0]["id"], f"{parcel_name}/Well", stats["failed_folders"]
+    ):
         return
 
-    well_links = _extract_all_links_with_scroll(page, max_scrolls=10)
+    well_links = _extract_all_links_with_scroll(page)
     reports_folders = [
         l for l in well_links
         if l["type"] == "folder" and "report" in l["name"].lower()
@@ -811,17 +952,21 @@ def _process_parcel(
     if not reports_folders:
         return
 
-    if not _navigate_and_wait(page, reports_folders[0]["id"]):
+    if not _navigate_and_wait(
+        page, reports_folders[0]["id"], f"{parcel_name}/Reports", stats["failed_folders"]
+    ):
         return
 
-    reports_links = _extract_all_links_with_scroll(page, max_scrolls=10)
+    reports_links = _extract_all_links_with_scroll(page)
     year_folders = [l for l in reports_links if l["type"] == "folder"]
 
     for year_folder in year_folders:
-        if not _navigate_and_wait(page, year_folder["id"]):
+        if not _navigate_and_wait(
+            page, year_folder["id"], f"{parcel_name}/{year_folder['name']}", stats["failed_folders"]
+        ):
             continue
 
-        year_links = _extract_all_links_with_scroll(page, max_scrolls=10)
+        year_links = _extract_all_links_with_scroll(page)
         pfas_docs = [
             l for l in year_links
             if l["type"] == "document"
