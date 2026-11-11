@@ -198,7 +198,14 @@ def _navigate_and_wait(
 # July 2026 is an overflow:hidden wrapper (DIV.v-outer), so the list never moved
 # and only the first screen (~30 rows) was collected.
 _SCROLL_LIST_JS = """
-() => {
+async (redrawTimeoutMs) => {
+    // Wait until the list has redrawn after a scroll, so the next read sees the
+    // new rows rather than the old ones (otherwise a screen of rows is skipped).
+    // The timeout keeps this from hanging if animation frames are throttled.
+    const redrawn = () => new Promise((resolve) => {
+        const t = setTimeout(resolve, redrawTimeoutMs);
+        requestAnimationFrame(() => requestAnimationFrame(() => { clearTimeout(t); resolve(); }));
+    });
     const isScrollable = (e) => {
         const oy = getComputedStyle(e).overflowY;
         return (oy === 'auto' || oy === 'scroll') && e.scrollHeight > e.clientHeight + 1;
@@ -216,6 +223,7 @@ _SCROLL_LIST_JS = """
     }
     if (!el) return {scrollable: false, atBottom: true};
     el.scrollTop = el.scrollTop + Math.max(el.clientHeight - 40, 40);
+    await redrawn();
     return {
         scrollable: true,
         atBottom: el.scrollTop + el.clientHeight >= el.scrollHeight - 2,
@@ -269,7 +277,7 @@ def _extract_all_links_with_scroll(page: Page, max_scrolls: Optional[int] = None
     for _ in range(cap):
         before = len(all_items)
         _collect_visible_links(page, all_items)
-        state = page.evaluate(_SCROLL_LIST_JS)
+        state = page.evaluate(_SCROLL_LIST_JS, settings.laserfiche_scroll_redraw_timeout_ms)
         page.wait_for_timeout(settings.laserfiche_scroll_settle_ms)
         stale = stale + 1 if len(all_items) == before else 0
         if state.get("atBottom") and stale >= stale_limit:

@@ -84,6 +84,13 @@ def main() -> int:
         check("last row present", any(i["name"] == "21 476" for i in items))
         check("read_entry_count matches", lf._read_entry_count(page) == 477)
 
+        # No settle wait at all: the crawler must still wait for the list to
+        # redraw after each scroll, or it reads stale rows and skips a screen.
+        lf.settings.laserfiche_scroll_settle_ms = 0
+        counts = [len({i["id"] for i in collect(page, 477, "p-virtualscroller")}) for _ in range(10)]
+        lf.settings.laserfiche_scroll_settle_ms = 20
+        check("477 rows collected with no settle wait (10 runs)", counts == [477] * 10, f"got {counts}")
+
         # Fallback path: scroller without the PrimeNG class.
         items = collect(page, 103, "")
         check("fallback (no class) collects all 103", len(items) == 103, f"got {len(items)}")

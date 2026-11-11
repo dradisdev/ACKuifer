@@ -65,6 +65,8 @@ class Settings(BaseSettings):
     # Stop once at the bottom and this many passes in a row found no new links.
     laserfiche_stale_scroll_passes: int = 2
     laserfiche_scroll_settle_ms: int = 300
+    # Longest wait for the list to redraw after a scroll (normally two frames).
+    laserfiche_scroll_redraw_timeout_ms: int = 500
     # Extra attempts after a folder load fails or times out.
     laserfiche_nav_retries: int = 2
     # Pause before every folder load, to stay under the portal's rate limit
