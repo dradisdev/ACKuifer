@@ -3,6 +3,8 @@
 import logging
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
+from html import escape as html_escape
+from typing import Optional
 
 import resend
 from sqlalchemy.orm import Session
@@ -560,10 +562,11 @@ def send_reconfirmation_email(user: User, db: Session) -> bool:
         return False
 
 
-def send_deadmans_alert(source: str, last_run_at) -> bool:
+def send_deadmans_alert(source: str, last_run_at, reason: Optional[str] = None) -> bool:
     """Send a dead man's switch alert to the operator.
 
-    Called when a scraper hasn't run successfully within DEADMANS_WINDOW_DAYS.
+    Called when a scraper hasn't run successfully within DEADMANS_WINDOW_DAYS,
+    or (with `reason`) when its latest run looks incomplete (D-2).
     """
     if not settings.resend_api_key or not settings.operator_email:
         logger.warning("Cannot send dead man's alert — missing RESEND_API_KEY or OPERATOR_EMAIL")
@@ -577,6 +580,16 @@ def send_deadmans_alert(source: str, last_run_at) -> bool:
     else:
         last_run_str = "Never"
 
+    if reason:
+        summary = f"The <strong>{source_label}</strong> scraper's latest run looks incomplete. {html_escape(reason)}"
+        subject = f"ACKuifer ALERT: {source_label} run incomplete"
+    else:
+        summary = (
+            f"The <strong>{source_label}</strong> scraper has not completed a successful run "
+            f"within the last <strong>{settings.deadmans_window_days} days</strong>."
+        )
+        subject = f"ACKuifer ALERT: {source_label} scraper overdue"
+
     html = f"""<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"></head>
@@ -587,8 +600,7 @@ def send_deadmans_alert(source: str, last_run_at) -> bool:
   </div>
   <div style="background:#FFFFFF;padding:20px;border-radius:0 0 8px 8px;border:1px solid #E2E8F0;border-top:none;">
     <p style="color:#1A202C;font-size:14px;line-height:1.6;">
-      The <strong>{source_label}</strong> scraper has not completed a successful run
-      within the last <strong>{settings.deadmans_window_days} days</strong>.
+      {summary}
     </p>
     <p style="color:#4A5568;font-size:14px;margin-top:12px;">
       Last successful run: <strong>{last_run_str}</strong>
@@ -606,7 +618,7 @@ def send_deadmans_alert(source: str, last_run_at) -> bool:
         resend.Emails.send({
             "from": settings.email_from,
             "to": [settings.operator_email],
-            "subject": f"ACKuifer ALERT: {source_label} scraper overdue",
+            "subject": subject,
             "html": html,
         })
         logger.warning("Dead man's switch alert sent for %s to %s", source, settings.operator_email)
