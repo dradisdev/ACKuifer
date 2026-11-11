@@ -46,3 +46,5 @@ Two dated lines per completed or paused item, appended by `/next` or `/pause` (n
 This file is public: no hosts, IPs, credentials, or house numbers.
 - 2026-11-10 — D-1: paused — crawler listing fix committed and tested; live census blocked by the portal's bot check
   Resume: see "Resume here" under D-1 in FINISH_PLAN.md
+- 2026-11-11 — D-1: crawler now lists every Laserfiche folder in full (scroll fix, redraw wait, bot-check handling, empty folders read as 0); full portal census matched on every folder
+  Verified on staging; awaiting promotion to main (staging crawl still running)
