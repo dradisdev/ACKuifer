@@ -52,3 +52,5 @@ This file is public: no hosts, IPs, credentials, or house numbers.
   Resume: see "Resume here" under D-2 in FINISH_PLAN.md
 - 2026-11-11 — D-2: paused — coverage guard merged to staging; D-1 staging crawl checked clean; capped-run fire drill not yet run
   Resume: see "Resume here" under D-2 in FINISH_PLAN.md
+- 2026-11-12 — D-2: coverage guard flags short folder listings as degraded and the dead man's switch alerts on them; capped-run fire drill produced a degraded run and an alert email
+  Verified on staging; awaiting promotion to main (with D-7 and D-3b)
