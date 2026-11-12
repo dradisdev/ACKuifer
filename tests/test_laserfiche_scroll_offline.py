@@ -102,6 +102,24 @@ def main() -> int:
         items = collect(page, 5, "p-virtualscroller")
         check("non-scrolling 5-row folder", len(items) == 5, f"got {len(items)}")
 
+        # D-2 coverage guard: the portal says 50 entries but only 30 rows exist.
+        stats = {"short_folders": [], "failed_folders": []}
+        page.set_content(fake_portal(30, "p-virtualscroller").replace("30 Entries", "50 Entries"))
+        lf._list_folder(page, "Map 66", stats)
+        check("short folder recorded", stats["short_folders"] == [{"name": "Map 66", "collected": 30, "expected": 50}],
+              f"got {stats['short_folders']}")
+        status, message = lf._final_status(stats, None)
+        check("short folder makes the run degraded", status == "degraded" and "Map 66 (30/50)" in message, message)
+
+        page.set_content(fake_portal(30, "p-virtualscroller"))
+        clean = {"short_folders": [], "failed_folders": []}
+        lf._list_folder(page, "Map 21", clean)
+        check("full folder not recorded", clean["short_folders"] == [])
+        check("clean full run is success", lf._final_status(clean, None) == ("success", None))
+        check("clean one-map run is partial", lf._final_status(clean, "21") == ("partial", None))
+        failed = {"short_folders": [], "failed_folders": [{"id": "9", "name": "Map 79", "error": "x"}]}
+        check("failed folder makes the run degraded", lf._final_status(failed, "21")[0] == "degraded")
+
         # Navigation failure is retried, then recorded rather than silently dropped.
         lf.settings.laserfiche_nav_retries = 1
         calls = {"n": 0}

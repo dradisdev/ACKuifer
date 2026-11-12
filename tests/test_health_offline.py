@@ -18,6 +18,9 @@ settings = _S()
 settings.deadmans_window_days = 20
 settings.operator_email = "op@example.com"
 settings.deadmans_alerting_enabled = True
+settings.deadmans_short_run_ratio = 0.5
+settings.deadmans_duration_baseline_runs = 5
+settings.deadmans_duration_check_sources = ("laserfiche",)
 cfg.settings = settings
 sys.modules["app.config"] = cfg
 
@@ -27,6 +30,8 @@ m_scraper = types.ModuleType("app.models.scraper")
 class _Col:
     def desc(self): return self
     def __eq__(self, other): return True
+    def __lt__(self, other): return True
+    def in_(self, other): return True
 class ScrapeRun:
     source = _Col(); status = _Col(); completed_at = _Col(); started_at = _Col()
 m_scraper.ScrapeRun = ScrapeRun
@@ -44,8 +49,8 @@ sys.modules["app.models.site_config"] = m_sc
 notif = types.ModuleType("app.notifications"); sys.modules["app.notifications"] = notif
 m_email = types.ModuleType("app.notifications.email")
 SENT = []
-def send_deadmans_alert(source, last_run_at):
-    SENT.append((source, last_run_at)); return True
+def send_deadmans_alert(source, last_run_at, reason=None):
+    SENT.append((source, last_run_at, reason)); return True
 m_email.send_deadmans_alert = send_deadmans_alert
 sys.modules["app.notifications.email"] = m_email
 
@@ -59,25 +64,28 @@ spec.loader.exec_module(health)
 
 # --- Fake DB / query layer ---
 class FakeRun:
-    def __init__(self, source, status, completed_at, started_at=None):
+    def __init__(self, source, status, completed_at, started_at=None, error_message=None):
         self.source, self.status = source, status
         self.completed_at, self.started_at = completed_at, started_at or completed_at
+        self.error_message = error_message
 
 class FakeQuery:
     def __init__(self, db, model): self.db, self.model = db, model; self._filters=[]
     def filter(self, *a, **k): return self  # filtering emulated via db buckets below
     def order_by(self, *a, **k): return self
+    def limit(self, *a, **k): return self
     def first(self):
         if self.model is SiteConfig:
             return self.db.cfg_rows.get(self._want_key)
         # ScrapeRun: return based on the most recent matching the current ask
         return self.db._next_run
-    def all(self): return []
+    def all(self): return self.db._earlier  # earlier successful runs (duration baseline)
 
 class FakeDB:
     def __init__(self):
         self.cfg_rows = {}      # key -> SiteConfig
         self._next_run = None
+        self._earlier = []
         self.committed = 0
     def query(self, model):
         q = FakeQuery(self, model)
@@ -170,5 +178,63 @@ settings.deadmans_alerting_enabled = True
 assert health.is_reserved_config_key("deadmans_last_alert_laserfiche") is True
 assert health.is_reserved_config_key("homepage_intro") is False
 print("5 reserved-key guard: PASS")
+
+# --- D-2 coverage guard ---
+def run_of(hours, ended, status="success", source="laserfiche", error_message=None):
+    return FakeRun(source, status, ended, started_at=ended - timedelta(hours=hours),
+                   error_message=error_message)
+
+def baseline(ended, hours=16.0, n=5):
+    return [run_of(hours, ended - timedelta(days=14 * (i + 1))) for i in range(n)]
+
+# 6) SHORT LISTING: latest run recorded short folders -> "degraded" -> alert with reason
+db = FakeDB()
+db._next_run = run_of(15, now - timedelta(days=1), status="degraded",
+                      error_message="1 short folder(s), 0 failed folder(s): Map 66 (13/477)")
+db._earlier = baseline(now)
+st = health.compute_scraper_status(db, "laserfiche", now=now)
+assert st["healthy"] is False and st["problem"] == "Last run degraded", st
+SENT.clear()
+health.check_and_alert(db, {"laserfiche": st}, now=now)
+assert SENT and "Map 66 (13/477)" in (SENT[0][2] or ""), f"degraded run must alert with folder names, got {SENT}"
+print("6 short listing (degraded run) -> alert: PASS")
+
+# 7) SHORT DURATION: 6h run after five 16h runs -> alert
+db = FakeDB()
+db._next_run = run_of(6, now - timedelta(days=1))
+db._earlier = baseline(now)
+st = health.compute_scraper_status(db, "laserfiche", now=now)
+assert st["healthy"] is False and st["problem"] == "Last run too short", st
+SENT.clear()
+health.check_and_alert(db, {"laserfiche": st}, now=now)
+assert SENT and "6.0h" in (SENT[0][2] or "") and "16.0h" in SENT[0][2], f"short run must alert, got {SENT}"
+print("7 short run duration -> alert: PASS")
+
+# 8) HEALTHY RUN: 15h run after five 16h runs, no short folders -> silent
+db = FakeDB()
+db._next_run = run_of(15, now - timedelta(days=1))
+db._earlier = baseline(now)
+st = health.compute_scraper_status(db, "laserfiche", now=now)
+assert st["healthy"] is True and st["problem"] is None, st
+SENT.clear()
+health.check_and_alert(db, {"laserfiche": st}, now=now)
+assert SENT == [], f"healthy run must stay silent, got {SENT}"
+print("8 healthy full run -> silent: PASS")
+
+# 8b) Not enough history (3 earlier runs) -> no duration verdict
+db = FakeDB()
+db._next_run = run_of(2, now - timedelta(days=1))
+db._earlier = baseline(now, n=3)
+st = health.compute_scraper_status(db, "laserfiche", now=now)
+assert st["healthy"] is True, "fewer than 5 earlier runs must not trigger the duration check"
+print("8b too little history -> no duration alert: PASS")
+
+# 8c) MassDEP is exempt from the duration check
+db = FakeDB()
+db._next_run = run_of(0.1, now - timedelta(days=1), source="massdep")
+db._earlier = [run_of(5, now - timedelta(days=d), source="massdep") for d in range(2, 7)]
+st = health.compute_scraper_status(db, "massdep", now=now)
+assert st["healthy"] is True, "massdep duration varies; must not be checked"
+print("8c massdep exempt from duration check: PASS")
 
 print("\nALL OFFLINE TESTS PASSED")

@@ -20,7 +20,7 @@ from typing import Optional
 
 from playwright.sync_api import sync_playwright, Page
 
-from app.config import settings, classify_result_status, FALLBACK_NEIGHBORHOOD, MCL
+from app.config import settings, classify_result_status, FALLBACK_NEIGHBORHOOD, MCL, NOTIFIABLE_RUN_STATUSES
 from app.database import SessionLocal
 from app.models.results import PfasResult
 from app.models.scraper import SeenDocument, ScrapeRun
@@ -250,6 +250,38 @@ def _read_entry_count(page: Page) -> Optional[int]:
         return _parse_entry_count(page.inner_text("body"))
     except Exception:
         return None
+
+
+def _list_folder(page: Page, label: str, stats: dict) -> list[dict]:
+    """List the open folder and record it in stats["short_folders"] if it came
+    up short of the portal's "N Entries" figure (D-2 coverage guard)."""
+    links = _extract_all_links_with_scroll(page)
+    expected = _read_entry_count(page)
+    if expected is not None and len(links) < expected:
+        logger.warning("Short listing: %s collected %d of %d", label, len(links), expected)
+        stats["short_folders"].append({"name": label, "collected": len(links), "expected": expected})
+    return links
+
+
+def _final_status(stats: dict, map_filter: Optional[str]) -> tuple[str, Optional[str]]:
+    """Status for a run that finished without crashing.
+
+    "degraded": some folder was short or failed to load, so coverage is incomplete.
+    "partial": a clean run limited to one map (a test run, not a full crawl).
+    "success": a clean full run.
+    """
+    short, failed = stats["short_folders"], stats["failed_folders"]
+    if short or failed:
+        cap = settings.laserfiche_degraded_folder_names_max
+        names = [f"{f['name']} ({f['collected']}/{f['expected']})" for f in short]
+        names += [f"{f['name']} (failed to load)" for f in failed]
+        message = f"{len(short)} short folder(s), {len(failed)} failed folder(s): " + ", ".join(names[:cap])
+        if len(names) > cap:
+            message += f", and {len(names) - cap} more"
+        return "degraded", message[:2000]
+    if map_filter:
+        return "partial", None
+    return "success", None
 
 
 def _collect_visible_links(page: Page, all_items: dict) -> None:
@@ -800,6 +832,7 @@ def run_laserfiche_scraper(
         "skipped_seen": 0,
         "errors": [],
         "failed_folders": [],
+        "short_folders": [],
     }
 
     final_status = "success"
@@ -822,7 +855,7 @@ def run_laserfiche_scraper(
                 raise RuntimeError("Failed to navigate to root folder")
 
             # Get map group folders (Maps 01-09, Maps 10-19, ..., Maps 90-99)
-            root_links = _extract_all_links_with_scroll(page)
+            root_links = _list_folder(page, "root", stats)
             map_groups = [
                 l for l in root_links
                 if l["type"] == "folder" and re.match(r"Maps?\s+\d", l["name"], re.IGNORECASE)
@@ -835,7 +868,7 @@ def run_laserfiche_scraper(
                     continue
 
                 # Get individual map folders within this group
-                group_links = _extract_all_links_with_scroll(page)
+                group_links = _list_folder(page, group["name"], stats)
                 map_folders = [l for l in group_links if l["type"] == "folder"]
                 logger.info("  %s contains %d map folders", group["name"], len(map_folders))
 
@@ -857,7 +890,7 @@ def run_laserfiche_scraper(
                         continue
 
                     # Get all parcel folders within this map
-                    parcel_links = _extract_all_links_with_scroll(page)
+                    parcel_links = _list_folder(page, map_folder["name"], stats)
                     parcel_folders = [l for l in parcel_links if l["type"] == "folder"]
                     logger.info("    Map %s: %d parcel folders", map_number, len(parcel_folders))
 
@@ -876,6 +909,11 @@ def run_laserfiche_scraper(
         logger.error("Scraper run failed: %s", e, exc_info=True)
         final_status = "error"
         error_message = str(e)[:2000]
+
+    if final_status == "success":
+        final_status, error_message = _final_status(stats, map_filter)
+        if final_status == "degraded":
+            logger.error("Run degraded: %s", error_message)
 
     if stats["failed_folders"]:
         logger.error(
@@ -897,7 +935,7 @@ def run_laserfiche_scraper(
             db.commit()
 
     # Send notifications if the run succeeded and found new results
-    if final_status == "success" and stats["new_docs_parsed"] > 0:
+    if final_status in NOTIFIABLE_RUN_STATUSES and stats["new_docs_parsed"] > 0:
         try:
             from app.notifications.engine import run_notifications
             with SessionLocal() as db:
@@ -915,6 +953,7 @@ def run_laserfiche_scraper(
         "skipped_seen": stats["skipped_seen"],
         "errors": stats["errors"],
         "failed_folders": stats["failed_folders"],
+        "short_folders": stats["short_folders"],
     }
 
 
@@ -929,7 +968,7 @@ def _process_parcel(
     if not _navigate_and_wait(page, parcel_folder_id, parcel_name, stats["failed_folders"]):
         return
 
-    prop_links = _extract_all_links_with_scroll(page)
+    prop_links = _list_folder(page, parcel_name, stats)
     well_folders = [
         l for l in prop_links
         if l["type"] == "folder" and l["name"].lower() in ("well", "wells")
@@ -943,7 +982,7 @@ def _process_parcel(
     ):
         return
 
-    well_links = _extract_all_links_with_scroll(page)
+    well_links = _list_folder(page, f"{parcel_name}/Well", stats)
     reports_folders = [
         l for l in well_links
         if l["type"] == "folder" and "report" in l["name"].lower()
@@ -957,7 +996,7 @@ def _process_parcel(
     ):
         return
 
-    reports_links = _extract_all_links_with_scroll(page)
+    reports_links = _list_folder(page, f"{parcel_name}/Reports", stats)
     year_folders = [l for l in reports_links if l["type"] == "folder"]
 
     for year_folder in year_folders:
@@ -966,7 +1005,7 @@ def _process_parcel(
         ):
             continue
 
-        year_links = _extract_all_links_with_scroll(page)
+        year_links = _list_folder(page, f"{parcel_name}/{year_folder['name']}", stats)
         pfas_docs = [
             l for l in year_links
             if l["type"] == "document"

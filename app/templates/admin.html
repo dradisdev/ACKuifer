@@ -91,6 +91,8 @@
         <h3>Laserfiche (Board of Health)</h3>
         {% if lf_status.healthy %}
         <span class="status-green">Healthy</span>
+        {% elif lf_status.problem %}
+        <span class="status-red">{{ lf_status.problem }}</span>
         {% else %}
         <span class="status-red">Overdue ({{ deadmans_window }}d)</span>
         {% endif %}
@@ -106,9 +108,9 @@
           {% else %}
           <p class="empty-state">No successful runs yet</p>
           {% endif %}
-          {% if lf_status.last_run and lf_status.last_run.status == 'error' %}
+          {% if lf_status.last_run and lf_status.last_run.status in ('error', 'degraded') %}
           <div style="margin-top:0.5rem;background:#FFF5F5;padding:0.5rem;border-radius:4px;font-size:0.8rem;color:#C53030;">
-            Last run error: {{ lf_status.last_run.error_message or 'Unknown' }}
+            Last run {{ lf_status.last_run.status }}: {{ lf_status.last_run.error_message or 'Unknown' }}
           </div>
           {% endif %}
         </div>
@@ -124,6 +126,8 @@
         <h3>MassDEP Source Discovery</h3>
         {% if sd_status.healthy %}
         <span class="status-green">Healthy</span>
+        {% elif sd_status.problem %}
+        <span class="status-red">{{ sd_status.problem }}</span>
         {% else %}
         <span class="status-red">Overdue ({{ deadmans_window }}d)</span>
         {% endif %}
@@ -139,9 +143,9 @@
           {% else %}
           <p class="empty-state">No successful runs yet</p>
           {% endif %}
-          {% if sd_status.last_run and sd_status.last_run.status == 'error' %}
+          {% if sd_status.last_run and sd_status.last_run.status in ('error', 'degraded') %}
           <div style="margin-top:0.5rem;background:#FFF5F5;padding:0.5rem;border-radius:4px;font-size:0.8rem;color:#C53030;">
-            Last run error: {{ sd_status.last_run.error_message or 'Unknown' }}
+            Last run {{ sd_status.last_run.status }}: {{ sd_status.last_run.error_message or 'Unknown' }}
           </div>
           {% endif %}
         </div>

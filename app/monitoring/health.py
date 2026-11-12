@@ -20,6 +20,7 @@ a silent monitor death — the exact false-negative this work removes).
 """
 
 import logging
+import statistics
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -35,6 +36,10 @@ _DEDUP_KEY_PREFIX = "deadmans_last_alert_"
 _ALERT_COOLDOWN = timedelta(hours=24)
 
 SOURCES = ("laserfiche", "massdep")
+
+# Statuses of runs that crawled everything they were asked to (not one-map
+# "partial" test runs, not crashed "error" runs). The coverage checks look at these.
+_FULL_RUN_STATUSES = ("success", "degraded")
 
 
 def is_reserved_config_key(key: str) -> bool:
@@ -92,8 +97,16 @@ def compute_scraper_status(db, source: str, now: Optional[datetime] = None) -> d
         .first()
     )
 
+    last_full_run = (
+        db.query(ScrapeRun)
+        .filter(ScrapeRun.source == source, ScrapeRun.status.in_(_FULL_RUN_STATUSES))
+        .order_by(ScrapeRun.completed_at.desc())
+        .first()
+    )
+
     last_success_at = _as_aware_utc(last_success.completed_at) if last_success else None
-    healthy = bool(last_success_at and last_success_at >= cutoff)
+    problem, problem_detail = _coverage_problem(db, source, last_full_run)
+    healthy = bool(last_success_at and last_success_at >= cutoff) and problem is None
 
     return {
         "last_success": last_success,
@@ -101,7 +114,61 @@ def compute_scraper_status(db, source: str, now: Optional[datetime] = None) -> d
         "currently_running": currently_running,
         "healthy": healthy,
         "last_success_at": last_success_at,  # aware UTC, convenience for callers
+        "problem": problem,                  # short label for the dashboard, or None
+        "problem_detail": problem_detail,    # sentence for the alert email, or None
     }
+
+
+def _run_seconds(run) -> Optional[float]:
+    start, end = _as_aware_utc(run.started_at), _as_aware_utc(run.completed_at)
+    if not start or not end:
+        return None
+    return (end - start).total_seconds()
+
+
+def _coverage_problem(db, source: str, latest) -> tuple[Optional[str], Optional[str]]:
+    """Why the latest full run can't be trusted to have covered everything (D-2).
+
+    Returns (label, detail), or (None, None) when it looks complete. Two signals:
+      - the run itself recorded short or failed folders ("degraded"), or
+      - it finished in under deadmans_short_run_ratio of the median duration of
+        the successful runs before it (the July 2026 cutoff looked like this).
+    """
+    from app.models.scraper import ScrapeRun
+
+    if latest is None:
+        return None, None
+    if latest.status == "degraded":
+        return "Last run degraded", (
+            "The last run did not list every folder: " + (latest.error_message or "no details recorded")
+        )
+    if source not in settings.deadmans_duration_check_sources:
+        return None, None
+
+    n = settings.deadmans_duration_baseline_runs
+    earlier = (
+        db.query(ScrapeRun)
+        .filter(
+            ScrapeRun.source == source,
+            ScrapeRun.status == "success",
+            ScrapeRun.completed_at < latest.completed_at,
+        )
+        .order_by(ScrapeRun.completed_at.desc())
+        .limit(n)
+        .all()
+    )
+    durations = [d for d in (_run_seconds(r) for r in earlier) if d]
+    latest_s = _run_seconds(latest)
+    if latest_s is None or len(durations) < n:
+        return None, None  # not enough history to judge
+    median = statistics.median(durations)
+    if latest_s < settings.deadmans_short_run_ratio * median:
+        return "Last run too short", (
+            f"The last run took {latest_s / 3600:.1f}h, under "
+            f"{settings.deadmans_short_run_ratio:.0%} of the usual {median / 3600:.1f}h "
+            f"(median of the {n} successful runs before it). It may have missed folders."
+        )
+    return None, None
 
 
 def _get_last_alert(db, source: str) -> Optional[datetime]:
@@ -188,7 +255,7 @@ def check_and_alert(db, statuses: dict, now: Optional[datetime] = None) -> dict:
 
         try:
             from app.notifications.email import send_deadmans_alert
-            send_deadmans_alert(source, last_run_at)
+            send_deadmans_alert(source, last_run_at, reason=status.get("problem_detail"))
             _set_last_alert(db, source, now)
             report["alerted"].append(source)
         except Exception:

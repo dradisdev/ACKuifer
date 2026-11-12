@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     # environment (e.g. staging, whose scrape cron is off) to silence alerts
     # there without a code change.
     deadmans_alerting_enabled: bool = True
+    # Coverage guard (D-2). A full run is suspect if it took under this share
+    # of the median duration of the successful runs before it.
+    deadmans_short_run_ratio: float = 0.5
+    deadmans_duration_baseline_runs: int = 5
+    # Sources whose run time is steady enough for the duration check.
+    deadmans_duration_check_sources: tuple[str, ...] = ("laserfiche",)
 
     # Scraper schedules
     laserfiche_cron_schedule: str = "0 8 1,15 * *"
@@ -77,9 +83,16 @@ class Settings(BaseSettings):
     laserfiche_block_backoff_seconds: int = 120
     # Stop the run (status "error") after this many folders in a row stay blocked.
     laserfiche_max_consecutive_blocks: int = 3
+    # Folder names listed in a degraded run's error message (the rest are counted).
+    laserfiche_degraded_folder_names_max: int = 50
 
 
 # --- Named constants (regulatory / business logic) ---
+
+# Scrape run statuses whose parsed results are valid to notify subscribers about.
+# "degraded" missed some folders and "partial" covered one map, but what they
+# parsed is real.
+NOTIFIABLE_RUN_STATUSES: tuple = ("success", "degraded", "partial")
 
 # Massachusetts PFAS6 maximum contaminant level (ppt)
 MCL: float = 20.0

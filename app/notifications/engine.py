@@ -5,7 +5,7 @@ from collections import defaultdict
 
 from sqlalchemy.orm import Session
 
-from app.config import SMS_THRESHOLD
+from app.config import NOTIFIABLE_RUN_STATUSES, SMS_THRESHOLD
 from app.models.results import PfasResult, SourceDiscoveryResult
 from app.models.scraper import ScrapeRun
 from app.models.users import Subscription, User
@@ -33,7 +33,7 @@ def run_notifications(scrape_run_id: str, db: Session) -> dict:
         logger.error("Scrape run %s not found", scrape_run_id)
         return {"status": "error", "reason": "scrape_run_not_found"}
 
-    if run.status != "success":
+    if run.status not in NOTIFIABLE_RUN_STATUSES:
         logger.info(
             "Scrape run %s status is '%s' — skipping notifications",
             scrape_run_id, run.status,

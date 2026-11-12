@@ -32,7 +32,7 @@ class ScrapeRun(Base):
     started_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True), nullable=True)
     last_progress_at = Column(DateTime(timezone=True), nullable=True)  # heartbeat; reaper treats stale (or NULL -> fall back to started_at) as a dead process
-    status = Column(String, default="running")  # 'running' / 'success' / 'error'
+    status = Column(String, default="running")  # 'running' / 'success' / 'degraded' / 'partial' (one map only) / 'error'
     new_docs_found = Column(Integer, default=0)
     new_docs_parsed = Column(Integer, default=0)
     parse_errors = Column(Integer, default=0)
