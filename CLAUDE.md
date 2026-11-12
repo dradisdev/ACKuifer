@@ -50,3 +50,5 @@ This file is public: no hosts, IPs, credentials, or house numbers.
   Verified on staging; awaiting promotion to main (staging crawl still running)
 - 2026-11-11 — D-2: paused — coverage guard committed and tested; merge to staging waits for the running staging crawl
   Resume: see "Resume here" under D-2 in FINISH_PLAN.md
+- 2026-11-11 — D-2: paused — coverage guard merged to staging; D-1 staging crawl checked clean; capped-run fire drill not yet run
+  Resume: see "Resume here" under D-2 in FINISH_PLAN.md
