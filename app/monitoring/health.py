@@ -255,7 +255,13 @@ def check_and_alert(db, statuses: dict, now: Optional[datetime] = None) -> dict:
 
         try:
             from app.notifications.email import send_deadmans_alert
-            send_deadmans_alert(source, last_run_at, reason=status.get("problem_detail"))
+            ok = send_deadmans_alert(source, last_run_at, reason=status.get("problem_detail"))
+            if not ok:
+                # Not sent (missing key, or Resend rejected it): don't start the
+                # cooldown, so the next check retries (N-12).
+                logger.error("Dead man's switch alert for %s was not sent; will retry", source)
+                report["errors"].append(f"send failed for {source}")
+                continue
             _set_last_alert(db, source, now)
             report["alerted"].append(source)
         except Exception:

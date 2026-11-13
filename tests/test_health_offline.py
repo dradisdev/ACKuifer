@@ -237,4 +237,23 @@ st = health.compute_scraper_status(db, "massdep", now=now)
 assert st["healthy"] is True, "massdep duration varies; must not be checked"
 print("8c massdep exempt from duration check: PASS")
 
+# --- N-12: a failed alert must not be recorded as sent ---
+# 9) send_deadmans_alert returns False (stale key / Resend rejected) -> no
+#    dedup timestamp, reported as an error, and the next check retries.
+db = FakeDB(); db._next_run = FakeRun("laserfiche", "success", now - timedelta(days=30))
+st = health.compute_scraper_status(db, "laserfiche", now=now)
+_real_send = m_email.send_deadmans_alert
+m_email.send_deadmans_alert = lambda source, last_run_at, reason=None: (SENT.append((source, last_run_at, reason)), False)[1]
+SENT.clear()
+rep = health.check_and_alert(db, {"laserfiche": st}, now=now)
+assert len(SENT) == 1, f"should have attempted one send, got {SENT}"
+assert (_orig_prefix + "laserfiche") not in db.cfg_rows, "failed send must not start the cooldown"
+assert "laserfiche" not in rep["alerted"] and "send failed for laserfiche" in rep["errors"], rep
+m_email.send_deadmans_alert = _real_send
+SENT.clear()
+rep = health.check_and_alert(db, {"laserfiche": st}, now=now + timedelta(minutes=10))
+assert SENT and rep["alerted"] == ["laserfiche"], f"next check must retry and send, got {SENT} {rep}"
+assert (_orig_prefix + "laserfiche") in db.cfg_rows, "successful retry must start the cooldown"
+print("9 failed alert not recorded as sent; retried next check (N-12): PASS")
+
 print("\nALL OFFLINE TESTS PASSED")

@@ -15,6 +15,17 @@ from app.notifications.sms import send_sms_alert
 logger = logging.getLogger(__name__)
 
 
+def _record_digest_failures(run, failed_digests: list, db: Session) -> None:
+    """Append a digest-failure note to the run's error_message (status unchanged).
+
+    Makes failed digests visible in the run history instead of only in logs (D-9).
+    """
+    note = "digest send failed: " + ", ".join(failed_digests)
+    run.error_message = f"{run.error_message}; {note}" if run.error_message else note
+    db.commit()
+    logger.error("Run %s: %s", run.id, note)
+
+
 def run_notifications(scrape_run_id: str, db: Session) -> dict:
     """Run all notifications for a completed scrape run.
 
@@ -90,11 +101,19 @@ def run_notifications(scrape_run_id: str, db: Session) -> dict:
 
     # Send digests per neighborhood
     total_emails = 0
+    total_failures = 0
+    failed_digests = []
     for hood in sorted(all_neighborhoods):
         hood_lf = lf_by_hood.get(hood, [])
         hood_sd = sd_by_hood.get(hood, [])
-        sent = send_neighborhood_digest(hood, hood_lf, hood_sd, db)
+        sent, failed = send_neighborhood_digest(hood, hood_lf, hood_sd, db)
         total_emails += sent
+        if failed:
+            total_failures += failed
+            failed_digests.append(f"{hood} ({failed} of {sent + failed})")
+
+    if failed_digests:
+        _record_digest_failures(run, failed_digests, db)
 
     # Send SMS alerts for results at or above SMS_THRESHOLD
     sms_sent = 0
@@ -150,6 +169,8 @@ def run_notifications(scrape_run_id: str, db: Session) -> dict:
         "results": total_results,
         "neighborhoods": len(all_neighborhoods),
         "emails": total_emails,
+        "email_failures": total_failures,
+        "failed_digests": failed_digests,
         "sms_sent": sms_sent,
         "sms_skipped": sms_skipped,
     }
