@@ -366,8 +366,13 @@ def send_neighborhood_digest(
     new_lf_results: list,
     new_sd_results: list,
     db: Session,
-) -> int:
+) -> tuple[int, int]:
     """Send a digest email to all subscribers of a neighborhood.
+
+    Results are marked notified only if at least one subscriber was actually
+    sent the digest. If every send fails (e.g. a stale RESEND_API_KEY or a
+    Resend outage), notified_at stays NULL so the next run retries them (D-9).
+    A partial failure still marks them, so recipients who got it aren't re-sent.
 
     Args:
         neighborhood: Neighborhood name.
@@ -376,11 +381,11 @@ def send_neighborhood_digest(
         db: Database session.
 
     Returns:
-        Number of emails sent.
+        (sent, failed): emails sent, and sends that raised.
     """
     if not settings.resend_api_key:
         logger.warning("RESEND_API_KEY not configured — skipping email digest")
-        return 0
+        return 0, 0
 
     resend.api_key = settings.resend_api_key
 
@@ -392,7 +397,7 @@ def send_neighborhood_digest(
         rows.append(_result_to_email_row(r, "massdep"))
 
     if not rows:
-        return 0
+        return 0, 0
 
     # Query active, confirmed subscribers for this neighborhood
     subscribers = (
@@ -408,12 +413,13 @@ def send_neighborhood_digest(
 
     if not subscribers:
         logger.info("No subscribers for %s — skipping digest", neighborhood)
-        return 0
+        return 0, 0
 
     count = len(rows)
     subject = f"ACKuifer: {count} new PFAS result{'s' if count != 1 else ''} in {neighborhood}"
 
     sent = 0
+    failed = 0
     for user in subscribers:
         # Import here to avoid circular imports at module level
         from app.notifications.tokens import generate_manage_token, generate_unsubscribe_token
@@ -435,7 +441,22 @@ def send_neighborhood_digest(
             sent += 1
             logger.info("Digest email sent to %s for %s", user.email, neighborhood)
         except Exception:
+            failed += 1
             logger.exception("Failed to send digest to %s", user.email)
+
+    if sent == 0:
+        # Nobody got it: leave notified_at NULL so the next run retries.
+        logger.error(
+            "Digest for %s failed for all %d subscriber(s); %d result(s) left un-notified for retry",
+            neighborhood, failed, len(rows),
+        )
+        return sent, failed
+
+    if failed:
+        logger.error(
+            "Digest for %s failed for %d of %d subscriber(s); results marked notified",
+            neighborhood, failed, sent + failed,
+        )
 
     # Mark results as notified
     now = datetime.now(timezone.utc)
@@ -445,7 +466,7 @@ def send_neighborhood_digest(
         r.notified_at = now
     db.commit()
 
-    return sent
+    return sent, failed
 
 
 def send_confirmation_email(user: User, db: Session) -> bool:
