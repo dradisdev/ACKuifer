@@ -54,3 +54,5 @@ This file is public: no hosts, IPs, credentials, or house numbers.
   Resume: see "Resume here" under D-2 in FINISH_PLAN.md
 - 2026-11-12 — D-2: coverage guard flags short folder listings as degraded and the dead man's switch alerts on them; capped-run fire drill produced a degraded run and an alert email
   Verified on staging; awaiting promotion to main (with D-7 and D-3b)
+- 2026-11-13 — D-9: a failed digest no longer marks its results as notified (retried next run, failure noted on the run); a failed dead man's alert no longer starts its cooldown (N-12)
+  Verified on staging; awaiting promotion to main (with D-1, D-2, D-7 and D-3b)
