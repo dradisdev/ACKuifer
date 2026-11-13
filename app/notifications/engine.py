@@ -7,12 +7,36 @@ from sqlalchemy.orm import Session
 
 from app.config import NOTIFIABLE_RUN_STATUSES, SMS_THRESHOLD
 from app.models.results import PfasResult, SourceDiscoveryResult
-from app.models.scraper import ScrapeRun
+from app.models.scraper import ScrapeRun, SeenDocument
 from app.models.users import Subscription, User
-from app.notifications.email import send_neighborhood_digest
+from app.notifications.email import is_new_for_subscriber, send_neighborhood_digest
 from app.notifications.sms import send_sms_alert
 
 logger = logging.getLogger(__name__)
+
+
+def _discovery_times(lf_results: list, sd_results: list, db: Session) -> dict:
+    """Map id(result) -> when it was discovered (D-7 cutoff input).
+
+    Laserfiche results carry discovered_at. MassDEP results don't, so use the
+    discovery time of their source PDF in seen_documents (source_doc_url is
+    "<pdf url>#<well id>"). A result whose PDF row is missing gets no time and
+    is treated as "not new" by is_new_for_subscriber.
+    """
+    times = {id(r): r.discovered_at for r in lf_results}
+    if sd_results:
+        pdf_of = {id(r): (r.source_doc_url or "").split("#", 1)[0] for r in sd_results}
+        rows = (
+            db.query(SeenDocument)
+            .filter(SeenDocument.doc_key.in_(set(pdf_of.values())))
+            .all()
+        )
+        seen_at = {row.doc_key: row.discovered_at for row in rows}
+        for r in sd_results:
+            times[id(r)] = seen_at.get(pdf_of[id(r)])
+            if times[id(r)] is None:
+                logger.warning("No discovery time for MassDEP result %s; not sent to anyone", r.source_doc_url)
+    return times
 
 
 def _record_digest_failures(run, failed_digests: list, db: Session) -> None:
@@ -100,13 +124,15 @@ def run_notifications(scrape_run_id: str, db: Session) -> dict:
     all_neighborhoods = set(lf_by_hood.keys()) | set(sd_by_hood.keys())
 
     # Send digests per neighborhood
+    discovered = _discovery_times(lf_results, sd_results, db)
+
     total_emails = 0
     total_failures = 0
     failed_digests = []
     for hood in sorted(all_neighborhoods):
         hood_lf = lf_by_hood.get(hood, [])
         hood_sd = sd_by_hood.get(hood, [])
-        sent, failed = send_neighborhood_digest(hood, hood_lf, hood_sd, db)
+        sent, failed = send_neighborhood_digest(hood, hood_lf, hood_sd, db, discovered_at=discovered)
         total_emails += sent
         if failed:
             total_failures += failed
@@ -158,6 +184,8 @@ def run_notifications(scrape_run_id: str, db: Session) -> dict:
             result_hood = result.neighborhood or "Nantucket (Island-wide)"
             for user in sms_users:
                 if result_hood in user_hoods.get(user.id, set()):
+                    if not is_new_for_subscriber(user, result_hood, discovered.get(id(result))):
+                        continue  # D-7: discovered before this user subscribed
                     if send_sms_alert(user, result, src):
                         sms_sent += 1
                     else:
