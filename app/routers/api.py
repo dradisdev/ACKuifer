@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.config import RETEST_WINDOW_DAYS
+from app.config import OLDER_REPORT_LABEL, RETEST_WINDOW_DAYS
 from app.database import get_db, SessionLocal
 from app.models.results import PfasResult, SourceDiscoveryResult
 from app.models.site_config import SiteConfig
@@ -84,6 +84,14 @@ def strip_unit_designator(street_name):
         "", street_name, flags=re.I,
     ).strip()
     return cleaned or street_name
+
+def older_report_label(result) -> Optional[str]:
+    """D-3b: the catch-up label for a Laserfiche result, or None if it has none."""
+    if not getattr(result, "older_report", False):
+        return None
+    sampled = result.sample_date.strftime("%b %d, %Y") if result.sample_date else "unknown date"
+    return OLDER_REPORT_LABEL.format(date=sampled)
+
 
 def _clean_sd_street_name(sample_location: str) -> str:
     """Strip house number and medium suffix from a Source Discovery sample_location.
@@ -267,6 +275,8 @@ def get_results(
             "sample_date": r.sample_date.isoformat() if r.sample_date else None,
             "source_doc_url": doc_url,
             "j_qualifier_present": bool(r.j_qualifier_present),
+            "older_report": bool(r.older_report),  # D-3b catch-up label
+            "older_report_label": older_report_label(r),
             "is_retest": False,
             "retest_group_id": None,
         })
@@ -301,6 +311,8 @@ def get_results(
             "sample_date": r.sample_date.isoformat() if r.sample_date else None,
             "source_doc_url": base_url,
             "j_qualifier_present": False,  # MassDEP records don't carry this flag
+            "older_report": False,
+            "older_report_label": None,
             "is_retest": False,
             "retest_group_id": None,
         })

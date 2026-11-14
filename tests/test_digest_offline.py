@@ -68,7 +68,7 @@ _mod("app.models.results", PfasResult=PfasResult, SourceDiscoveryResult=SourceDi
 _mod("app.models.users", User=User, Subscription=Subscription)
 _mod("app.models.scraper", ScrapeRun=ScrapeRun, SeenDocument=SeenDocument)
 _mod("app.routers")
-_mod("app.routers.api", _clean_sd_street_name=lambda s: s)
+_mod("app.routers.api", _clean_sd_street_name=lambda s: s, older_report_label=lambda r: None)
 _mod("app.notifications")
 _mod("app.notifications.tokens",
      generate_manage_token=lambda uid: "m", generate_unsubscribe_token=lambda uid: "u")

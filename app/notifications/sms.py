@@ -6,7 +6,7 @@ If Twilio credentials are not set, logs the would-be message and returns gracefu
 
 import logging
 
-from app.config import MCL, SMS_THRESHOLD, settings
+from app.config import MCL, OLDER_REPORT_SHORT, SMS_THRESHOLD, settings
 from app.routers.api import _clean_sd_street_name
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ def _is_twilio_configured() -> bool:
 
 
 def _build_sms_message(neighborhood: str, pfas6_sum: float, street_name: str,
-                        sample_date, source_doc_url: str) -> str:
+                        sample_date, source_doc_url: str, older_report: bool = False) -> str:
     """Build SMS message per PRD Section 6.3 (fit within 160 chars).
 
     Format: 'ACKuifer: PFAS detect in [Neighborhood] -- [X.X] ppt on [Street Name].
@@ -36,10 +36,13 @@ def _build_sms_message(neighborhood: str, pfas6_sum: float, street_name: str,
     date_str = sample_date.strftime("%m/%d/%y") if sample_date else "N/A"
     url_part = f" See: {source_doc_url}" if source_doc_url else ""
 
+    # D-3b: a catch-up result says so instead of reading as a new sample.
+    date_part = (f"{OLDER_REPORT_SHORT}, sampled {date_str}." if older_report
+                 else f"Sample date {date_str}.")
     msg = (
         f"{prefix}ACKuifer: PFAS detect in {neighborhood} -- "
         f"{pfas6_sum:.1f} ppt on {street_name}. "
-        f"Sample date {date_str}.{url_part}"
+        f"{date_part}{url_part}"
     )
 
     # Truncate to 160 chars if needed
@@ -79,7 +82,8 @@ def send_sms_alert(user, result, source: str) -> bool:
         street = _clean_sd_street_name(result.sample_location)
         doc_url = result.source_doc_url.split("#")[0] if result.source_doc_url else None
 
-    message = _build_sms_message(neighborhood, pfas6, street, result.sample_date, doc_url)
+    older = bool(getattr(result, "older_report", False)) if source == "laserfiche" else False
+    message = _build_sms_message(neighborhood, pfas6, street, result.sample_date, doc_url, older)
 
     if not _is_twilio_configured():
         logger.info(

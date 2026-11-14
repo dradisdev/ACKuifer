@@ -16,7 +16,7 @@ from app.models.users import Subscription, User
 logger = logging.getLogger(__name__)
 
 # Reuse the street-name cleaning logic from api.py for Source Discovery display
-from app.routers.api import _clean_sd_street_name
+from app.routers.api import _clean_sd_street_name, older_report_label
 
 
 def _format_date(d) -> str:
@@ -61,6 +61,8 @@ def _result_to_email_row(result, source: str) -> dict:
         "retest": False,
         "retest_arrow": "",
         "retest_prev_value": "",
+        # D-3b: only Laserfiche results carry the catch-up label.
+        "older_report_label": older_report_label(result) if source == "laserfiche" else None,
     }
 
 
@@ -226,6 +228,11 @@ def _build_digest_html(neighborhood: str, rows: list, unsubscribe_url: str, mana
             )
 
         street_display = f'{r["street_name"]}{retest_badge}'
+        if r.get("older_report_label"):
+            label = html_escape(r["older_report_label"])
+            street_display += (
+                f'<br><span style="font-size:12px;color:#718096;font-style:italic;">{label}</span>'
+            )
 
         return f"""<tr style="background:{bg};">
   <td style="padding:10px 12px;border-bottom:1px solid #EDF2F7;{bold}">{street_display}</td>

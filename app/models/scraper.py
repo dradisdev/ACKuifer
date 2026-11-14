@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import Column, DateTime, Integer, String, Text, func
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.database import Base
@@ -37,3 +37,4 @@ class ScrapeRun(Base):
     new_docs_parsed = Column(Integer, default=0)
     parse_errors = Column(Integer, default=0)
     error_message = Column(Text, nullable=True)
+    catchup = Column(Boolean, nullable=False, default=False, server_default="false")  # D-3b one-off catch-up run

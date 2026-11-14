@@ -786,12 +786,15 @@ def reap_stale_runs(source: str = "laserfiche") -> int:
 def run_laserfiche_scraper(
     headless: bool = True,
     map_filter: Optional[str] = None,
+    catchup: bool = False,
 ) -> dict:
     """Run the full Laserfiche scraper.
 
     Args:
         headless: Run browser in headless mode.
         map_filter: If set, only scrape this map number (e.g. "21" for testing).
+        catchup: D-3b one-off catch-up run. The run is recorded as catchup and
+            every result it inserts is labelled older_report.
 
     Returns:
         Summary dict with run stats.
@@ -807,6 +810,7 @@ def run_laserfiche_scraper(
             source="laserfiche",
             status="running",
             last_progress_at=datetime.utcnow(),
+            catchup=catchup,
         )
         db.add(run)
         db.commit()
@@ -833,6 +837,7 @@ def run_laserfiche_scraper(
         "errors": [],
         "failed_folders": [],
         "short_folders": [],
+        "catchup": catchup,
     }
 
     final_status = "success"
@@ -1105,6 +1110,7 @@ def _process_document(
             j_qualifier_present=parsed.get("j_qualifier_present", False),
             pass_fail=parsed.get("pass_fail", "UNKNOWN"),
             result_status=result_status,
+            older_report=bool(stats.get("catchup", False)),
         )
 
         # Save result (fresh session)
