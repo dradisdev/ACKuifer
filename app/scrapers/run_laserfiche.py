@@ -12,6 +12,13 @@ Usage:
 
     # D-3b one-off catch-up run (or set CATCHUP_RUN=1 on the cron service)
     python3 -m app.scrapers.run_laserfiche --catchup
+
+    # Full crawl now, outside the schedule (or LASERFICHE_FORCE_RUN=1)
+    python3 -m app.scrapers.run_laserfiche --force
+
+N-11: without --map, --catchup or --force (or their env vars), a full crawl
+only runs within the window after a time in LASERFICHE_CRON_SCHEDULE. Any
+other start, such as a Railway deploy, exits at once without crawling.
 """
 
 import argparse
@@ -20,6 +27,7 @@ import sys
 
 from app.config import settings
 from app.scrapers.laserfiche import run_laserfiche_scraper
+from app.scrapers.start_guard import start_reason
 
 logging.basicConfig(
     level=logging.INFO,
@@ -48,10 +56,34 @@ def main():
         help="D-3b one-off catch-up run: label every new result as an older report "
              "(same as CATCHUP_RUN=1).",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Run a full crawl now, whatever the time (same as LASERFICHE_FORCE_RUN=1).",
+    )
     args = parser.parse_args()
 
     headless = not args.no_headless
     catchup = args.catchup or settings.catchup_run
+
+    # N-11: Railway also runs this on every deploy. Skip unless it's a scheduled
+    # time or the run was asked for explicitly.
+    reason = start_reason(
+        cron=settings.laserfiche_cron_schedule,
+        window_minutes=settings.laserfiche_schedule_window_minutes,
+        catchup=catchup,
+        force=args.force or settings.laserfiche_force_run,
+        map_filter=args.map_filter,
+    )
+    if reason is None:
+        logger.info(
+            "Deploy start, not a scheduled run (schedule %s UTC, window %d min): "
+            "no crawl. Set LASERFICHE_FORCE_RUN=1 or CATCHUP_RUN=1 to crawl on start.",
+            settings.laserfiche_cron_schedule,
+            settings.laserfiche_schedule_window_minutes,
+        )
+        return
+    logger.info("Starting crawl: %s", reason)
     logger.info(
         "Starting Laserfiche scraper (headless=%s, map_filter=%s, catchup=%s)",
         headless,

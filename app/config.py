@@ -52,8 +52,14 @@ class Settings(BaseSettings):
     # Sources whose run time is steady enough for the duration check.
     deadmans_duration_check_sources: tuple[str, ...] = ("laserfiche",)
 
-    # Scraper schedules
+    # Scraper schedules (UTC). laserfiche_cron_schedule must match the
+    # production laserfiche-cron schedule in the Railway dashboard: the N-11
+    # start guard only lets a crawl run within the window after these times.
     laserfiche_cron_schedule: str = "0 8 1,15 * *"
+    laserfiche_schedule_window_minutes: int = 60
+    # N-11: LASERFICHE_FORCE_RUN=1 runs a full crawl on start, whatever the time
+    # (e.g. a staging crawl). Remove it afterwards, or every deploy will crawl.
+    laserfiche_force_run: bool = False
     massdep_cron_schedule: str = "0 9 1,15 * *"
 
     # Laserfiche portal constants
