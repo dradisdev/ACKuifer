@@ -56,3 +56,5 @@ This file is public: no hosts, IPs, credentials, or house numbers.
   Verified on staging; awaiting promotion to main (with D-7 and D-3b)
 - 2026-11-13 — D-9: a failed digest no longer marks its results as notified (retried next run, failure noted on the run); a failed dead man's alert no longer starts its cooldown (N-12)
   Verified on staging; awaiting promotion to main (with D-1, D-2, D-7 and D-3b)
+- 2026-11-14 — D-7: new subscribers only get results discovered after they subscribed (per neighborhood; email and SMS), so a first digest no longer floods them with old records
+  Verified on staging; awaiting promotion to main (with D-1, D-2, D-9 and D-3b)
