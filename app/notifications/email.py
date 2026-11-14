@@ -361,11 +361,40 @@ def _build_reconfirmation_html(user_email: str, reconfirm_url: str, unsubscribe_
 </html>"""
 
 
+def _aware_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    if dt is None:
+        return None
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
+
+
+def subscription_cutoff(user, neighborhood: str) -> Optional[datetime]:
+    """When this user subscribed to this neighborhood (latest, if duplicated)."""
+    times = [
+        _aware_utc(s.created_at)
+        for s in (user.subscriptions or [])
+        if s.neighborhood == neighborhood and s.created_at is not None
+    ]
+    return max(times) if times else None
+
+
+def is_new_for_subscriber(user, neighborhood: str, discovered_at: Optional[datetime]) -> bool:
+    """D-7: a subscriber only hears about results discovered after they subscribed.
+
+    Unknown times count as "not new", so a gap in the data can never flood anyone.
+    """
+    cutoff = subscription_cutoff(user, neighborhood)
+    found = _aware_utc(discovered_at)
+    if cutoff is None or found is None:
+        return False
+    return found > cutoff
+
+
 def send_neighborhood_digest(
     neighborhood: str,
     new_lf_results: list,
     new_sd_results: list,
     db: Session,
+    discovered_at: Optional[dict] = None,
 ) -> tuple[int, int]:
     """Send a digest email to all subscribers of a neighborhood.
 
@@ -373,6 +402,12 @@ def send_neighborhood_digest(
     sent the digest. If every send fails (e.g. a stale RESEND_API_KEY or a
     Resend outage), notified_at stays NULL so the next run retries them (D-9).
     A partial failure still marks them, so recipients who got it aren't re-sent.
+
+    Each subscriber only gets the results discovered after they subscribed to
+    this neighborhood (D-7). Results no current subscriber is eligible for are
+    marked notified: every future subscription is newer still, so nobody ever will be.
+    `discovered_at` maps id(result) -> discovery time; when omitted, a result's
+    own `discovered_at` attribute is used.
 
     Args:
         neighborhood: Neighborhood name.
@@ -389,14 +424,17 @@ def send_neighborhood_digest(
 
     resend.api_key = settings.resend_api_key
 
-    # Build normalized rows for template
-    rows = []
+    # Build normalized rows for template, keeping each row's discovery time
+    discovered_at = discovered_at or {}
+    items = []
     for r in new_lf_results:
-        rows.append(_result_to_email_row(r, "laserfiche"))
+        items.append((_result_to_email_row(r, "laserfiche"),
+                      discovered_at.get(id(r), getattr(r, "discovered_at", None))))
     for r in new_sd_results:
-        rows.append(_result_to_email_row(r, "massdep"))
+        items.append((_result_to_email_row(r, "massdep"),
+                      discovered_at.get(id(r), getattr(r, "discovered_at", None))))
 
-    if not rows:
+    if not items:
         return 0, 0
 
     # Query active, confirmed subscribers for this neighborhood
@@ -415,12 +453,17 @@ def send_neighborhood_digest(
         logger.info("No subscribers for %s — skipping digest", neighborhood)
         return 0, 0
 
-    count = len(rows)
-    subject = f"ACKuifer: {count} new PFAS result{'s' if count != 1 else ''} in {neighborhood}"
-
     sent = 0
     failed = 0
+    eligible = 0
     for user in subscribers:
+        rows = [row for row, found in items if is_new_for_subscriber(user, neighborhood, found)]
+        if not rows:
+            continue  # D-7: nothing discovered since this subscriber signed up
+        eligible += 1
+        count = len(rows)
+        subject = f"ACKuifer: {count} new PFAS result{'s' if count != 1 else ''} in {neighborhood}"
+
         # Import here to avoid circular imports at module level
         from app.notifications.tokens import generate_manage_token, generate_unsubscribe_token
 
@@ -444,11 +487,17 @@ def send_neighborhood_digest(
             failed += 1
             logger.exception("Failed to send digest to %s", user.email)
 
-    if sent == 0:
+    if eligible == 0:
+        logger.info(
+            "No subscriber of %s is eligible for these %d result(s) (all discovered before "
+            "they subscribed); marking notified without sending",
+            neighborhood, len(items),
+        )
+    elif sent == 0:
         # Nobody got it: leave notified_at NULL so the next run retries.
         logger.error(
             "Digest for %s failed for all %d subscriber(s); %d result(s) left un-notified for retry",
-            neighborhood, failed, len(rows),
+            neighborhood, failed, len(items),
         )
         return sent, failed
 
