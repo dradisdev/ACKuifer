@@ -59,6 +59,9 @@ settings.email_from = "alerts@example.com"
 settings.base_url = "https://example.test"
 settings.twilio_account_sid = settings.twilio_auth_token = settings.twilio_from_number = ""
 settings.catchup_run = False
+settings.laserfiche_force_run = False
+settings.laserfiche_cron_schedule = "0 8 1,15 * *"
+settings.laserfiche_schedule_window_minutes = 60
 
 class PfasResult:
     hidden = _Col(); neighborhood = _Col(); result_status = _Col(); sample_date = _Col()
@@ -101,6 +104,7 @@ def _load(name, rel):
 api = _load("app.routers.api", "app/routers/api.py")
 email = _load("app.notifications.email", "app/notifications/email.py")
 sms = _load("app.notifications.sms", "app/notifications/sms.py")
+_load("app.scrapers.start_guard", "app/scrapers/start_guard.py")
 runner = _load("app.scrapers.run_laserfiche", "app/scrapers/run_laserfiche.py")
 
 
@@ -182,7 +186,7 @@ def run(argv, env_flag):
         pass
     return CALLS[0]["catchup"]
 
-check("5a default run is not a catch-up", run([], False) is False)
+check("5a a normal (forced) run is not a catch-up", run(["--force"], False) is False)
 check("5b --catchup makes a catch-up run", run(["--catchup"], False) is True)
 check("5c CATCHUP_RUN=1 makes a catch-up run", run([], True) is True)
 
