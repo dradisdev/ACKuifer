@@ -58,3 +58,5 @@ This file is public: no hosts, IPs, credentials, or house numbers.
   Verified on staging; awaiting promotion to main (with D-1, D-2, D-7 and D-3b)
 - 2026-11-14 — D-7: new subscribers only get results discovered after they subscribed (per neighborhood; email and SMS), so a first digest no longer floods them with old records
   Verified on staging; awaiting promotion to main (with D-1, D-2, D-9 and D-3b)
+- 2026-11-15 — N-11: a deploy no longer starts a full Laserfiche crawl; the crawler runs only at its scheduled time or when a catch-up or forced run is asked for
+  Verified on staging; awaiting promotion to main (with D-1, D-2, D-7, D-9 and D-3b)
