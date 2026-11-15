@@ -62,3 +62,5 @@ This file is public: no hosts, IPs, credentials, or house numbers.
   Verified on staging; awaiting promotion to main (with D-1, D-2, D-7, D-9 and D-3b)
 - 2026-11-15 — D-3b: paused — label code and migration on staging; labelled-result check waits on the D-3 rehearsal and the production fingerprint check
   Resume: see "Resume here" under D-3b in FINISH_PLAN.md
+- 2026-11-15 — D-3b: paused — staging catch-up rehearsal running (two docs reset to re-find); label check waits for the crawl to finish
+  Resume: see "Resume here" under D-3b in FINISH_PLAN.md
