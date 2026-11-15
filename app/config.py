@@ -85,6 +85,9 @@ class Settings(BaseSettings):
     laserfiche_max_consecutive_blocks: int = 3
     # Folder names listed in a degraded run's error message (the rest are counted).
     laserfiche_degraded_folder_names_max: int = 50
+    # D-3b: set CATCHUP_RUN=1 only on the one-off catch-up crawl. Every result it
+    # inserts is labelled as an older report, newly added.
+    catchup_run: bool = False
 
 
 # --- Named constants (regulatory / business logic) ---
@@ -117,6 +120,14 @@ RETEST_WINDOW_DAYS: int = 60
 # 0.05 suppresses floating-point dust and trivial rounding; certified-total
 # vs raw-sum gaps above this are listed for review against the source PDF.
 DISCREPANCY_TOLERANCE_PPT: float = 0.05
+
+# D-3b: label for results found by the one-time catch-up run (older_report).
+# "{date}" is the sample date, e.g. "May 26, 2026".
+OLDER_REPORT_LABEL: str = (
+    "Older report, newly added: sampled {date}. This report was filed earlier "
+    "but only recently added to ACKuifer."
+)
+OLDER_REPORT_SHORT: str = "Older report, newly added"
 
 # Fallback neighborhood for unresolved parcels
 FALLBACK_NEIGHBORHOOD: str = "Nantucket (Island-wide)"
