@@ -7,7 +7,8 @@ If Twilio credentials are not set, logs the would-be message and returns gracefu
 import logging
 
 from app.config import MCL, OLDER_REPORT_SHORT, SMS_THRESHOLD, settings
-from app.routers.api import _clean_sd_street_name, older_report_label
+from app.geo.street_names import normalize_street_name
+from app.routers.api import _clean_sd_street_name, older_report_label, strip_unit_designator
 
 logger = logging.getLogger(__name__)
 
@@ -73,13 +74,13 @@ def send_sms_alert(user, result, source: str) -> bool:
     neighborhood = result.neighborhood or "Nantucket"
 
     if source == "laserfiche":
-        street = result.street_name or "Unknown location"
+        street = normalize_street_name(strip_unit_designator(result.street_name)) or "Unknown location"
         doc_url = (
             f"https://portal.laserfiche.com/Portal/DocView.aspx"
             f"?id={result.laserfiche_doc_id}&repo=r-ec7bdbfe"
         )
     else:
-        street = _clean_sd_street_name(result.sample_location)
+        street = normalize_street_name(_clean_sd_street_name(result.sample_location))
         doc_url = result.source_doc_url.split("#")[0] if result.source_doc_url else None
 
     older = source == "laserfiche" and older_report_label(result) is not None

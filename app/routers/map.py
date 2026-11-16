@@ -11,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.config import settings
 from app.geo.neighborhood import lookup_neighborhood
+from app.geo.street_names import apply_search_corrections
 from app.routers.admin import _is_authenticated
 
 logger = logging.getLogger(__name__)
@@ -66,6 +67,9 @@ def search(address: str = Form(...)):
     address = address.strip()
     if not address:
         return RedirectResponse(url="/map", status_code=303)
+
+    # D-3: spell out streets the geocoder only knows by their full name ("5th Way").
+    address = apply_search_corrections(address)
 
     # Append "Nantucket, MA" if not already present
     addr_lower = address.lower()
