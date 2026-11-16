@@ -7,7 +7,7 @@ If Twilio credentials are not set, logs the would-be message and returns gracefu
 import logging
 
 from app.config import MCL, OLDER_REPORT_SHORT, SMS_THRESHOLD, settings
-from app.routers.api import _clean_sd_street_name
+from app.routers.api import _clean_sd_street_name, older_report_label
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ def _build_sms_message(neighborhood: str, pfas6_sum: float, street_name: str,
     date_str = sample_date.strftime("%m/%d/%y") if sample_date else "N/A"
     url_part = f" See: {source_doc_url}" if source_doc_url else ""
 
-    # D-3b: a catch-up result says so instead of reading as a new sample.
+    # D-3b: an older report (see older_report_label) says so instead of reading as a new sample.
     date_part = (f"{OLDER_REPORT_SHORT}, sampled {date_str}." if older_report
                  else f"Sample date {date_str}.")
     msg = (
@@ -82,7 +82,7 @@ def send_sms_alert(user, result, source: str) -> bool:
         street = _clean_sd_street_name(result.sample_location)
         doc_url = result.source_doc_url.split("#")[0] if result.source_doc_url else None
 
-    older = bool(getattr(result, "older_report", False)) if source == "laserfiche" else False
+    older = source == "laserfiche" and older_report_label(result) is not None
     message = _build_sms_message(neighborhood, pfas6, street, result.sample_date, doc_url, older)
 
     if not _is_twilio_configured():
