@@ -151,6 +151,8 @@ STREET_SUFFIXES: dict = {
 # Known corrections (whole street name, case-insensitive), applied after the
 # suffix map. The map search only finds the spelled-out ordinal streets, so
 # they are also applied to search queries.
+# NEVER merge different real streets here. Known pairs that must stay separate:
+#   Pochick Avenue (Surfside) and Pochick Street (Siasconset).
 STREET_NAME_CORRECTIONS: dict = {
     "2nd Way": "Second Way",
     "3rd Way": "Third Way",

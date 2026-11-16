@@ -8,7 +8,8 @@ Proves:
      applies the known corrections (2nd-5th Way), and leaves alone what it
      can't decide (Rainbow's End, Quidnet, Polpis Road (A), a leading "St").
   2. Every multi-spelling group that differs only by an abbreviation collapses
-     to one name (e.g. "Polpis Rd" and "Polpis Road").
+     to one name (e.g. "Polpis Rd" and "Polpis Road"), while different real
+     streets stay apart (Pochick Avenue in Surfside vs Pochick Street in Sconset).
   3. The crawler's _extract_street_name drops the house number, its fraction,
      and stores the standard spelling.
   4. Search corrections spell out "5th Way" inside a query, and leave house
@@ -109,6 +110,16 @@ for g in GROUPS:
     check(f"2 {g} -> one name", len(out) == 1, out)
 check("2 different real suffixes stay different",
       norm("Long Pond Drive") != norm("Long Pond Road"))
+
+# Pochick Avenue (Surfside) and Pochick Street (Siasconset) are different real
+# streets and must never be merged, by the suffix map or by a correction.
+eq("2 Pochick Ave -> Avenue", norm("Pochick Ave"), "Pochick Avenue")
+eq("2 Pochick St -> Street", norm("Pochick St."), "Pochick Street")
+eq("2 Pochick Avenue unchanged", norm("Pochick Avenue"), "Pochick Avenue")
+eq("2 Pochick Street unchanged", norm("Pochick Street"), "Pochick Street")
+pochick = {k.lower(): v for k, v in _config_constant("STREET_NAME_CORRECTIONS").items()}
+check("2 no correction maps one Pochick onto the other",
+      not any("pochick" in k or "pochick" in v.lower() for k, v in pochick.items()))
 
 # 3. Crawler extraction (function body taken from the real file)
 src = (ROOT / "app/scrapers/laserfiche.py").read_text()
