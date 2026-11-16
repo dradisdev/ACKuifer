@@ -64,3 +64,5 @@ This file is public: no hosts, IPs, credentials, or house numbers.
   Resume: see "Resume here" under D-3b in FINISH_PLAN.md
 - 2026-11-15 — D-3b: paused — staging catch-up rehearsal running (two docs reset to re-find); label check waits for the crawl to finish
   Resume: see "Resume here" under D-3b in FINISH_PLAN.md
+- 2026-11-16 — D-3b: digest emails and SMS label a report as "older report, newly added" when it was sampled more than 90 days before ACKuifer found it; the map shows no label, and the catch-up switch only starts a crawl
+  Verified on staging; awaiting promotion to main (with D-1, D-2, D-7, D-9 and N-11)
