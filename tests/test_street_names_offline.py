@@ -84,6 +84,9 @@ CASES = [
     ("2nd Way", "Second Way"),
     ("3rd Way", "Third Way"),
     ("4th Way", "Fourth Way"),
+    ("Millbrook", "Millbrook Road"),
+    ("MILLBROOK", "Millbrook Road"),
+    ("Millbrook Rd", "Millbrook Road"),
     ("Polpis Rd (A)", "Polpis Road (A)"),
     ("Polpis Road (D)", "Polpis Road (D)"),
     ("Rainbow's End", "Rainbow's End"),
@@ -104,6 +107,7 @@ GROUPS = [
     ["Roberts Lane", "Roberts Ln"], ["Sesachacha RD", "Sesachacha Road"],
     ["Skyline Dr", "Skyline Dr.", "Skyline Drive"], ["Surfside Rd", "Surfside Road"],
     ["Western Ave", "Western Avenue"], ["Okorwaw Ave", "Okorwaw Avenue"],
+    ["Millbrook", "Millbrook Road"],
 ]
 for g in GROUPS:
     out = {norm(x) for x in g}
@@ -140,6 +144,11 @@ eq("4 ordinal in query", asc("10 5th Way"), "10 Fifth Way")
 eq("4 any case", asc("10 5TH way, Nantucket"), "10 Fifth Way, Nantucket")
 eq("4 other text untouched", asc("10 Polpis Rd"), "10 Polpis Rd")
 eq("4 longer number untouched", asc("105th Way"), "105th Way")
+eq("4 bare Millbrook gets its suffix", asc("10 Millbrook"), "10 Millbrook Road")
+eq("4 bare Millbrook before town", asc("10 Millbrook, Nantucket"), "10 Millbrook Road, Nantucket")
+eq("4 Millbrook Rd not doubled", asc("10 Millbrook Rd"), "10 Millbrook Rd")
+eq("4 Millbrook Road not doubled", asc("10 Millbrook Road"), "10 Millbrook Road")
+eq("4 ordinal followed by suffix-like word untouched", asc("10 5th Way Extension"), "10 5th Way Extension")
 
 # 5. Wiring
 api = (ROOT / "app/routers/api.py").read_text()

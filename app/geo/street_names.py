@@ -63,7 +63,12 @@ def normalize_street_name(name: Optional[str]) -> Optional[str]:
 
 
 def apply_search_corrections(query: str) -> str:
-    """Spell out known street names inside a free-text search ("10 5th Way" -> "10 Fifth Way")."""
+    """Spell out known street names inside a free-text search ("10 5th Way" -> "10 Fifth Way").
+
+    A correction applies only when the name ends the street part of the query
+    (followed by a comma or the end), so "10 Millbrook Rd" never becomes
+    "10 Millbrook Road Rd".
+    """
     for wrong, right in STREET_NAME_CORRECTIONS.items():
-        query = re.sub(rf"(?<![\w/]){re.escape(wrong)}\b", right, query, flags=re.I)
+        query = re.sub(rf"(?<![\w/]){re.escape(wrong)}(?=\s*(?:,|$))", right, query, flags=re.I)
     return query

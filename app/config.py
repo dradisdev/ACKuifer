@@ -158,6 +158,8 @@ STREET_NAME_CORRECTIONS: dict = {
     "3rd Way": "Third Way",
     "4th Way": "Fourth Way",
     "5th Way": "Fifth Way",
+    # Operator-confirmed on the map 2026-11-16: every "Millbrook" result is on Millbrook Road.
+    "Millbrook": "Millbrook Road",
 }
 
 # Fallback neighborhood for unresolved parcels
