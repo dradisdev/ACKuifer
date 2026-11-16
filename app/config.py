@@ -140,6 +140,24 @@ OLDER_REPORT_LABEL: str = (
 )
 OLDER_REPORT_SHORT: str = "Older report, newly added"
 
+# D-3 street names: a trailing abbreviated suffix is spelled out for display and
+# on new results (key: lower case, no trailing dot). Only the last word changes,
+# so a leading "St" (Saint) is never touched.
+STREET_SUFFIXES: dict = {
+    "rd": "Road", "ave": "Avenue", "av": "Avenue", "ln": "Lane", "dr": "Drive",
+    "st": "Street", "ct": "Court", "cir": "Circle", "pl": "Place", "ter": "Terrace",
+    "blvd": "Boulevard", "hwy": "Highway",
+}
+# Known corrections (whole street name, case-insensitive), applied after the
+# suffix map. The map search only finds the spelled-out ordinal streets, so
+# they are also applied to search queries.
+STREET_NAME_CORRECTIONS: dict = {
+    "2nd Way": "Second Way",
+    "3rd Way": "Third Way",
+    "4th Way": "Fourth Way",
+    "5th Way": "Fifth Way",
+}
+
 # Fallback neighborhood for unresolved parcels
 FALLBACK_NEIGHBORHOOD: str = "Nantucket (Island-wide)"
 

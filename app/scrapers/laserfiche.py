@@ -25,6 +25,7 @@ from app.database import SessionLocal
 from app.models.results import PfasResult
 from app.models.scraper import SeenDocument, ScrapeRun
 from app.geo import resolve_location
+from app.geo.street_names import normalize_street_name
 
 logger = logging.getLogger(__name__)
 
@@ -425,14 +426,18 @@ def _strip_ui_chrome(text: str) -> str:
 
 
 def _extract_street_name(address: str) -> Optional[str]:
-    """Extract street name from full address, stripping house number."""
+    """Extract street name from full address, stripping house number.
+
+    The result is stored in its standard spelling (D-3, normalize_street_name).
+    """
     if not address:
         return None
     # Take portion before first comma
     street_part = address.split(",")[0].strip()
-    # Strip leading house number + optional letter suffix (e.g. "30R")
-    street_part = re.sub(r"^\d+[A-Za-z]?\s+", "", street_part)
-    return street_part if street_part else None
+    # Strip leading house number + optional letter suffix (e.g. "30R"), and a
+    # fraction that belongs to it (e.g. "12 1/2"): house numbers are never shown.
+    street_part = re.sub(r"^\d+[A-Za-z]?(?:\s+\d+/\d+)?\s+", "", street_part)
+    return normalize_street_name(street_part) if street_part else None
 
 
 def _parse_report(page: Page, doc_id: str) -> Optional[dict]:

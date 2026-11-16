@@ -13,6 +13,7 @@ from app.database import get_db, SessionLocal
 from app.models.results import PfasResult, SourceDiscoveryResult
 from app.models.site_config import SiteConfig
 from app.geo.parcel_lookup import lookup_parcel, parcel_street_name
+from app.geo.street_names import normalize_street_name
 
 router = APIRouter(prefix="/api", tags=["api"])
 
@@ -265,9 +266,9 @@ def get_results(
         # of the folder identifies the property even when the PDF doesn't —
         # look the street name up from the same parcel index that produced
         # the coordinates.
-        street_name = strip_unit_designator(
+        street_name = normalize_street_name(strip_unit_designator(
             r.street_name or parcel_street_name(resolved_map, resolved_parcel)
-            )
+            ))
         results.append({
             "id": str(r.id),
             "source": "laserfiche",
@@ -310,7 +311,7 @@ def get_results(
             "lat": float(r.latitude),
             "lng": float(r.longitude),
             "neighborhood": r.neighborhood,
-            "street_name": _clean_sd_street_name(r.sample_location),
+            "street_name": normalize_street_name(_clean_sd_street_name(r.sample_location)),
             "pfas6_sum": float(r.pfas6_sum) if r.pfas6_sum is not None else None,
             "result_status": r.result_status,
             "sample_date": r.sample_date.isoformat() if r.sample_date else None,

@@ -83,7 +83,8 @@ def _no_db():
 _mod("app")
 _mod("app.config", MCL=20.0, SMS_THRESHOLD=16.0, RETEST_WINDOW_DAYS=60,
      OLDER_REPORT_LABEL=LABEL, OLDER_REPORT_SHORT=SHORT,
-     OLDER_REPORT_MIN_AGE_DAYS=MIN_AGE, settings=settings)
+     OLDER_REPORT_MIN_AGE_DAYS=MIN_AGE, STREET_SUFFIXES=_config_constant("STREET_SUFFIXES"),
+     STREET_NAME_CORRECTIONS=_config_constant("STREET_NAME_CORRECTIONS"), settings=settings)
 _mod("app.database", get_db=lambda: None, SessionLocal=_no_db)
 _mod("app.models")
 _mod("app.models.results", PfasResult=PfasResult, SourceDiscoveryResult=SourceDiscoveryResult)
@@ -108,6 +109,7 @@ def _load(name, rel):
     spec.loader.exec_module(mod)
     return mod
 
+_load("app.geo.street_names", "app/geo/street_names.py")
 api = _load("app.routers.api", "app/routers/api.py")
 email = _load("app.notifications.email", "app/notifications/email.py")
 sms = _load("app.notifications.sms", "app/notifications/sms.py")

@@ -16,7 +16,8 @@ from app.models.users import Subscription, User
 logger = logging.getLogger(__name__)
 
 # Reuse the street-name cleaning logic from api.py for Source Discovery display
-from app.routers.api import _clean_sd_street_name, older_report_label
+from app.geo.street_names import normalize_street_name
+from app.routers.api import _clean_sd_street_name, older_report_label, strip_unit_designator
 
 
 def _format_date(d) -> str:
@@ -36,13 +37,13 @@ def _format_value(pfas6_sum) -> str:
 def _result_to_email_row(result, source: str) -> dict:
     """Normalize a PfasResult or SourceDiscoveryResult into a dict for the email template."""
     if source == "laserfiche":
-        street = result.street_name or "Unknown location"
+        street = normalize_street_name(strip_unit_designator(result.street_name)) or "Unknown location"
         doc_url = (
             f"https://portal.laserfiche.com/Portal/DocView.aspx"
             f"?id={result.laserfiche_doc_id}&repo=r-ec7bdbfe"
         )
     else:
-        street = _clean_sd_street_name(result.sample_location)
+        street = normalize_street_name(_clean_sd_street_name(result.sample_location))
         doc_url = result.source_doc_url.split("#")[0] if result.source_doc_url else None
 
     pfas6 = float(result.pfas6_sum) if result.pfas6_sum is not None else 0.0
