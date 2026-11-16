@@ -10,7 +10,7 @@ Usage:
     # Dry-run style: filter to a single map
     python3 -m app.scrapers.run_laserfiche --map 42
 
-    # D-3b one-off catch-up run (or set CATCHUP_RUN=1 on the cron service)
+    # One-off catch-up crawl, recorded as a catch-up run (or set CATCHUP_RUN=1 on the cron service)
     python3 -m app.scrapers.run_laserfiche --catchup
 
     # Full crawl now, outside the schedule (or LASERFICHE_FORCE_RUN=1)
@@ -53,8 +53,8 @@ def main():
     parser.add_argument(
         "--catchup",
         action="store_true",
-        help="D-3b one-off catch-up run: label every new result as an older report "
-             "(same as CATCHUP_RUN=1).",
+        help="One-off catch-up crawl outside the schedule, recorded as a catch-up run "
+             "(same as CATCHUP_RUN=1). Does not label results.",
     )
     parser.add_argument(
         "--force",

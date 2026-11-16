@@ -793,8 +793,9 @@ def run_laserfiche_scraper(
     Args:
         headless: Run browser in headless mode.
         map_filter: If set, only scrape this map number (e.g. "21" for testing).
-        catchup: D-3b one-off catch-up run. The run is recorded as catchup and
-            every result it inserts is labelled older_report.
+        catchup: one-off catch-up run, started outside the schedule. The run
+            is recorded as catchup; results are not labelled by it (the
+            older-report label depends on sample age, see older_report_label).
 
     Returns:
         Summary dict with run stats.
@@ -1110,7 +1111,6 @@ def _process_document(
             j_qualifier_present=parsed.get("j_qualifier_present", False),
             pass_fail=parsed.get("pass_fail", "UNKNOWN"),
             result_status=result_status,
-            older_report=bool(stats.get("catchup", False)),
         )
 
         # Save result (fresh session)

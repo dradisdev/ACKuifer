@@ -61,7 +61,7 @@ def _result_to_email_row(result, source: str) -> dict:
         "retest": False,
         "retest_arrow": "",
         "retest_prev_value": "",
-        # D-3b: only Laserfiche results carry the catch-up label.
+        # D-3b: only Laserfiche results can carry the older-report label.
         "older_report_label": older_report_label(result) if source == "laserfiche" else None,
     }
 

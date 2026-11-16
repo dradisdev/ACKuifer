@@ -91,8 +91,9 @@ class Settings(BaseSettings):
     laserfiche_max_consecutive_blocks: int = 3
     # Folder names listed in a degraded run's error message (the rest are counted).
     laserfiche_degraded_folder_names_max: int = 50
-    # D-3b: set CATCHUP_RUN=1 only on the one-off catch-up crawl. Every result it
-    # inserts is labelled as an older report, newly added.
+    # CATCHUP_RUN=1 starts a full crawl on deploy, outside the schedule (N-11), and
+    # records the run as a catch-up. It does not label results (see
+    # OLDER_REPORT_MIN_AGE_DAYS).
     catchup_run: bool = False
 
 
@@ -127,7 +128,11 @@ RETEST_WINDOW_DAYS: int = 60
 # vs raw-sum gaps above this are listed for review against the source PDF.
 DISCREPANCY_TOLERANCE_PPT: float = 0.05
 
-# D-3b: label for results found by the one-time catch-up run (older_report).
+# D-3b: a Laserfiche result is labelled "older report, newly added" in digest
+# emails and SMS (never on the map) when its sample date is more than this many
+# days before ACKuifer found it, whichever run found it. Production 2026-05..11:
+# 3 of 37 normally-found reports were over 90 days (median 24-63 days).
+OLDER_REPORT_MIN_AGE_DAYS: int = 90
 # "{date}" is the sample date, e.g. "May 26, 2026".
 OLDER_REPORT_LABEL: str = (
     "Older report, newly added: sampled {date}. This report was filed earlier "

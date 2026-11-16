@@ -1,14 +1,19 @@
-"""Offline test of the D-3b catch-up label ("older report, newly added"); fakes only.
+"""Offline test of the D-3b "older report, newly added" label; fakes only.
+
+Rule (redesign 2026-11-16): a Laserfiche result is labelled when its sample date
+is more than OLDER_REPORT_MIN_AGE_DAYS (90) before it was discovered, whichever
+run found it. Digest email and SMS only; never the map; never MassDEP.
 
 Proves:
-  1. A catch-up result gets the label, with its sample date; a normal result and
-     a MassDEP result get none.
-  2. The map API returns the label for a catch-up result and None otherwise.
-  3. The digest email shows the label on the catch-up row only.
-  4. The SMS for a catch-up result says so instead of "Sample date".
-  5. --catchup or CATCHUP_RUN=1 makes the crawler run as a catch-up; neither
-     means a normal run.
-The label wording is read from the real app/config.py, so the test checks it too.
+  1. The age rule: 91 days labelled, 90 and 89 not; no sample date or no
+     discovery time means no label; the catch-up flag neither adds nor removes it.
+  2. The map API and the popup template carry no label.
+  3. The digest email shows the label on the old Laserfiche row only.
+  4. The SMS follows the same rule (old Laserfiche: "Older report"; recent and
+     MassDEP: "Sample date"), within 160 chars.
+  5. --catchup or CATCHUP_RUN=1 still starts a catch-up run (recorded on the
+     run row), but the scraper no longer sets older_report on results.
+The label wording and the cutoff are read from the real app/config.py.
 Run: python3 tests/test_older_report_offline.py
 """
 import ast
@@ -16,7 +21,7 @@ import importlib.util
 import logging
 import sys
 import types
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 logging.disable(logging.CRITICAL)
@@ -32,6 +37,7 @@ def _config_constant(name):
 
 LABEL = _config_constant("OLDER_REPORT_LABEL")
 SHORT = _config_constant("OLDER_REPORT_SHORT")
+MIN_AGE = _config_constant("OLDER_REPORT_MIN_AGE_DAYS")
 
 
 # --- Fake app.* modules ---
@@ -76,7 +82,8 @@ def _no_db():
 
 _mod("app")
 _mod("app.config", MCL=20.0, SMS_THRESHOLD=16.0, RETEST_WINDOW_DAYS=60,
-     OLDER_REPORT_LABEL=LABEL, OLDER_REPORT_SHORT=SHORT, settings=settings)
+     OLDER_REPORT_LABEL=LABEL, OLDER_REPORT_SHORT=SHORT,
+     OLDER_REPORT_MIN_AGE_DAYS=MIN_AGE, settings=settings)
 _mod("app.database", get_db=lambda: None, SessionLocal=_no_db)
 _mod("app.models")
 _mod("app.models.results", PfasResult=PfasResult, SourceDiscoveryResult=SourceDiscoveryResult)
@@ -109,24 +116,31 @@ runner = _load("app.scrapers.run_laserfiche", "app/scrapers/run_laserfiche.py")
 
 
 # --- Fake results ---
+FOUND = datetime(2026, 11, 15, 16, 0, tzinfo=timezone.utc)
+
+def ago(days):
+    return FOUND.date() - timedelta(days=days)
+
 class LF:
-    def __init__(self, doc_id, street, older, pfas6=0.0, status="NON-DETECT"):
+    def __init__(self, doc_id, street, age_days, catchup_flag=False, pfas6=25.0, status="DETECT"):
         self.id = doc_id; self.laserfiche_doc_id = doc_id; self.street_name = street
-        self.older_report = older; self.sample_date = date(2026, 5, 26)
+        self.sample_date = ago(age_days) if age_days is not None else None
+        self.discovered_at = FOUND
+        self.older_report = catchup_flag  # legacy column: must be ignored
         self.pfas6_sum = pfas6; self.result_status = status; self.neighborhood = "Polpis"
         self.map_number = "21"; self.parcel_number = "1"; self.parcel_override = None
         self.j_qualifier_present = False; self.hidden = False
 
 class SD:
-    older_report = True  # must be ignored: only Laserfiche results are labelled
+    older_report = True  # must be ignored: MassDEP results are never labelled
     def __init__(self):
         self.id = 7; self.sample_location = "Polpis Rd well"; self.source_doc_url = "https://example.test/a.pdf#1"
-        self.sample_date = date(2026, 5, 26); self.pfas6_sum = 0.0; self.result_status = "NON-DETECT"
+        self.sample_date = ago(2000); self.discovered_at = FOUND
+        self.pfas6_sum = 25.0; self.result_status = "DETECT"
         self.neighborhood = "Polpis"; self.latitude = 41.3; self.longitude = -70.0
 
-old = LF(412666, "Catchup Road", older=True)
-new = LF(500001, "Normal Lane", older=False)
-WANT = LABEL.format(date="May 26, 2026")
+def want(r):
+    return LABEL.format(date=r.sample_date.strftime("%b %d, %Y"))
 
 failures = 0
 def check(name, cond, detail=""):
@@ -135,13 +149,26 @@ def check(name, cond, detail=""):
     failures += 0 if cond else 1
 
 
-# 1. Label helper
-check("1a catch-up result is labelled with its sample date", api.older_report_label(old) == WANT,
-      api.older_report_label(old))
-check("1b normal result has no label", api.older_report_label(new) is None)
-check("1c wording matches FINISH_PLAN", WANT.startswith("Older report, newly added: sampled May 26, 2026."), WANT)
+# 1. Age rule
+check("1a cutoff is 90 days", MIN_AGE == 90, MIN_AGE)
+d91, d90, d89 = LF(1, "A", MIN_AGE + 1), LF(2, "B", MIN_AGE), LF(3, "C", MIN_AGE - 1)
+check("1b 91 days: labelled with its sample date", api.older_report_label(d91) == want(d91),
+      api.older_report_label(d91))
+check("1c 90 days: no label", api.older_report_label(d90) is None)
+check("1d 89 days: no label", api.older_report_label(d89) is None)
+check("1e no sample date: no label", api.older_report_label(LF(4, "D", None)) is None)
+nodisc = LF(5, "E", 400); nodisc.discovered_at = None
+check("1f no discovery time: no label", api.older_report_label(nodisc) is None)
+check("1g catch-up result only 30 days old: no label",
+      api.older_report_label(LF(6, "F", 30, catchup_flag=True)) is None)
+normal_old = LF(7, "G", 120, catchup_flag=False)
+check("1h normal-run result 120 days old: labelled", api.older_report_label(normal_old) == want(normal_old))
+may26 = LF(412666, "Sesachacha Road", None); may26.sample_date = date(2026, 5, 26)
+check("1i wording matches FINISH_PLAN",
+      api.older_report_label(may26) == LABEL.format(date="May 26, 2026")
+      and LABEL.format(date="May 26, 2026").startswith("Older report, newly added: sampled May 26, 2026."))
 
-# 2. Map API
+# 2. Map: no label anywhere
 class FakeQuery:
     def __init__(self, rows): self.rows = rows
     def filter(self, *a, **k): return self
@@ -149,34 +176,47 @@ class FakeQuery:
     def first(self): return None
 class FakeDB:
     def query(self, model):
-        return FakeQuery({PfasResult: [old, new], SourceDiscoveryResult: [SD()]}.get(model, []))
+        return FakeQuery({PfasResult: [LF(10, "Old Road", 200, True), LF(11, "New Lane", 30)],
+                          SourceDiscoveryResult: [SD()]}.get(model, []))
 
-out = {r["street_name"]: r for r in api.get_results(neighborhood=None, status=None, days=None, db=FakeDB())}
-check("2a API labels the catch-up result",
-      out["Catchup Road"]["older_report"] is True and out["Catchup Road"]["older_report_label"] == WANT)
-check("2b API: normal result unlabelled",
-      out["Normal Lane"]["older_report"] is False and out["Normal Lane"]["older_report_label"] is None)
-sd_rows = [r for r in out.values() if r["source"] == "massdep"]
-check("2c API: MassDEP result unlabelled", sd_rows and sd_rows[0]["older_report_label"] is None)
+api_rows = api.get_results(neighborhood=None, status=None, days=None, db=FakeDB())
+check("2a map API returns rows", len(api_rows) == 3, len(api_rows))
+check("2b map API has no label fields",
+      all("older_report" not in r and "older_report_label" not in r for r in api_rows))
+tpl = (ROOT / "app/templates/map.html").read_text()
+check("2c popup template has no label", "older_report" not in tpl and "popup-older" not in tpl)
 
 # 3. Digest email
+old, new = LF(20, "Old Road", 120, catchup_flag=False), LF(21, "New Lane", 30, catchup_flag=True)
 rows = [email._result_to_email_row(old, "laserfiche"), email._result_to_email_row(new, "laserfiche"),
         email._result_to_email_row(SD(), "massdep")]
 html = email._build_digest_html("Polpis", rows, "https://u", "https://m")
-check("3a digest shows the label once", html.count("Older report, newly added: sampled May 26, 2026.") == 1)
-idx_label, idx_old, idx_new = html.find("Older report"), html.find("Catchup Road"), html.find("Normal Lane")
-check("3b label sits on the catch-up row", idx_old < idx_label and (idx_new < idx_old or idx_label < idx_new),
-      f"old={idx_old} label={idx_label} new={idx_new}")
-check("3c MassDEP row unlabelled", rows[2]["older_report_label"] is None)
+check("3a digest shows the label once", html.count("Older report, newly added") == 1)
+i_label, i_old, i_new = html.find("Older report"), html.find("Old Road"), html.find("New Lane")
+check("3b label sits on the old row", i_old < i_label and (i_new < i_old or i_label < i_new),
+      f"old={i_old} label={i_label} new={i_new}")
+check("3c recent catch-up row and MassDEP row unlabelled",
+      rows[1]["older_report_label"] is None and rows[2]["older_report_label"] is None)
 
-# 4. SMS
-m_old = sms._build_sms_message("Polpis", 25.0, "Catchup Road", date(2026, 5, 26), "https://d", older_report=True)
-m_new = sms._build_sms_message("Polpis", 25.0, "Normal Lane", date(2026, 5, 26), "https://d")
-check("4a SMS for catch-up result says older report", f"{SHORT}, sampled 05/26/26." in m_old, m_old)
-check("4b SMS for normal result unchanged", "Sample date 05/26/26." in m_new and SHORT not in m_new, m_new)
-check("4c SMS stays within 160 chars", len(m_old) <= 160 and len(m_new) <= 160)
+# 4. SMS (through send_sms_alert, Twilio not configured, so nothing is sent)
+class U: mobile = "+15555550100"
+def sms_text(result, source):
+    seen = []
+    real = sms._build_sms_message
+    sms._build_sms_message = lambda *a, **k: (seen.append(real(*a, **k)), seen[-1])[1]
+    try:
+        sms.send_sms_alert(U(), result, source)
+    finally:
+        sms._build_sms_message = real
+    return seen[0]
 
-# 5. Runner flag
+m_old, m_new, m_sd = sms_text(old, "laserfiche"), sms_text(new, "laserfiche"), sms_text(SD(), "massdep")
+check("4a SMS for an old report says so", f"{SHORT}, sampled" in m_old, m_old)
+check("4b SMS for a recent catch-up result is unchanged", "Sample date" in m_new and SHORT not in m_new, m_new)
+check("4c SMS for MassDEP is unchanged", "Sample date" in m_sd and SHORT not in m_sd, m_sd)
+check("4d SMS stays within 160 chars", all(len(m) <= 160 for m in (m_old, m_new, m_sd)))
+
+# 5. Runner flag: still starts a catch-up run, no longer labels
 def run(argv, env_flag):
     CALLS.clear(); settings.catchup_run = env_flag
     sys.argv = ["run_laserfiche"] + argv
@@ -189,11 +229,9 @@ def run(argv, env_flag):
 check("5a a normal (forced) run is not a catch-up", run(["--force"], False) is False)
 check("5b --catchup makes a catch-up run", run(["--catchup"], False) is True)
 check("5c CATCHUP_RUN=1 makes a catch-up run", run([], True) is True)
-
-# The scraper wires the flag into the run row and every inserted result.
 src = (ROOT / "app/scrapers/laserfiche.py").read_text()
-check("5d scraper records catchup on the run and older_report on results",
-      "catchup=catchup," in src and 'older_report=bool(stats.get("catchup", False))' in src)
+check("5d scraper records catchup on the run", "catchup=catchup," in src)
+check("5e scraper no longer sets older_report on results", "older_report=" not in src)
 
 print()
 if failures:

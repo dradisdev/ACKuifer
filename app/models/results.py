@@ -38,7 +38,8 @@ class PfasResult(Base):
     # is correct but absent from the GeoJSON layer. Stored map_number/
     # parcel_number stay truthful to the source document. See doc 302830.
     parcel_override = Column(String, nullable=True)
-    # D-3b: found by the one-time catch-up run (filed earlier, newly added).
+    # D-3b: no longer written or read. The label is now computed from sample age
+    # (app.routers.api.older_report_label). Kept so migration 004 is unchanged.
     older_report = Column(Boolean, nullable=False, default=False, server_default="false")
 
 
