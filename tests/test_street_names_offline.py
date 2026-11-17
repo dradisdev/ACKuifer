@@ -5,8 +5,9 @@ Proves:
      variants: Rd, RD, Rd., Ave, Ave., Ln, Dr, Dr., St, St.), fixes all-caps,
      removes a leading house-number fraction, a trailing M/P parcel tag, and the
      town name with anything after it (so an owner's name is never shown),
-     applies the known corrections (2nd-5th Way), and leaves alone what it
-     can't decide (Rainbow's End, Quidnet, Polpis Road (A), a leading "St").
+     applies the known corrections (2nd-5th Way) and the operator's D-8
+     decisions, and leaves alone what it can't decide (Rainbow's End,
+     Polpis Road (A), a leading "St").
   2. Every multi-spelling group that differs only by an abbreviation collapses
      to one name (e.g. "Polpis Rd" and "Polpis Road"), while different real
      streets stay apart (Pochick Avenue in Surfside vs Pochick Street in Sconset).
@@ -15,6 +16,9 @@ Proves:
   4. Search corrections spell out "5th Way" inside a query, and leave house
      numbers and other text alone.
   5. The map API, digest email and SMS all pass street names through it.
+  6. D-8 (operator 2026-11-17): every staging spelling in a decided group shows
+     one name; the real street pairs stay apart; the D-8 list is display-only,
+     so a search for a village name ("Madaket", "Quidnet") is not rewritten.
 The suffix map and corrections are read from the real app/config.py.
 Run: python3 tests/test_street_names_offline.py
 """
@@ -39,6 +43,7 @@ def _config_constant(name):
 cfg = types.ModuleType("app.config")
 cfg.STREET_SUFFIXES = _config_constant("STREET_SUFFIXES")
 cfg.STREET_NAME_CORRECTIONS = _config_constant("STREET_NAME_CORRECTIONS")
+cfg.STREET_NAME_DISPLAY_CORRECTIONS = _config_constant("STREET_NAME_DISPLAY_CORRECTIONS")
 sys.modules["app"] = types.ModuleType("app")
 sys.modules["app.config"] = cfg
 spec = importlib.util.spec_from_file_location("app.geo.street_names", ROOT / "app/geo/street_names.py")
@@ -90,7 +95,7 @@ CASES = [
     ("Polpis Rd (A)", "Polpis Road (A)"),
     ("Polpis Road (D)", "Polpis Road (D)"),
     ("Rainbow's End", "Rainbow's End"),
-    ("Quidnet", "Quidnet"),
+    ("Quidnet", "Quidnet Road"),
     ("St Paul Lane", "St Paul Lane"),
     ("St", "St"),
     ("McKinley Ave", "McKinley Avenue"),
@@ -113,7 +118,7 @@ for g in GROUPS:
     out = {norm(x) for x in g}
     check(f"2 {g} -> one name", len(out) == 1, out)
 check("2 different real suffixes stay different",
-      norm("Long Pond Drive") != norm("Long Pond Road"))
+      norm("Miacomet Avenue") != norm("Miacomet Road"))
 
 # Pochick Avenue (Surfside) and Pochick Street (Siasconset) are different real
 # streets and must never be merged, by the suffix map or by a correction.
@@ -149,6 +154,52 @@ eq("4 bare Millbrook before town", asc("10 Millbrook, Nantucket"), "10 Millbrook
 eq("4 Millbrook Rd not doubled", asc("10 Millbrook Rd"), "10 Millbrook Rd")
 eq("4 Millbrook Road not doubled", asc("10 Millbrook Road"), "10 Millbrook Road")
 eq("4 ordinal followed by suffix-like word untouched", asc("10 5th Way Extension"), "10 5th Way Extension")
+
+# 6. D-8 operator decisions (2026-11-17), every staging spelling per group
+D8_GROUPS = {
+    "Dukes Road": ["Dukes Road", "Dukes", "DUKES RD"],
+    "Madaket Road": ["Madaket Road", "Madaket", "Madaket Rd"],
+    "Okorwaw Avenue": ["Okorwaw Avenue", "Okorwaw"],
+    "Quidnet Road": ["Quidnet Road", "Quidnet"],
+    "Sesapana Road": ["Sesapana Road", "Sesapana"],
+    "Tennessee Avenue": ["Tennessee Avenue", "Tennessee", "Tennessee Ave"],
+    "Vestal Street": ["Vestal Street", "Vestal", "Vestal St"],
+    "Chuck Hollow Road": ["Chuck Hollow Road", "Chuck Hollow"],
+    "Wood Hollow Road": ["Wood Hollow Road", "Wood Hollow"],
+    "Hummock Pond Road": ["Hummock Pond Road", "Hummock Pond"],
+    "Tom Nevers Road": ["Tom Nevers Road", "Tom Nevers"],
+    "Eel Point Road": ["Eel Point Road", "Eel Point", "Eel Point Rd"],
+    "Helens Drive": ["Helens Drive", "Helen's Drive", "Helen's Dr"],
+    "Lovers Lane": ["Lovers Lane", "Lover's Lane", "LOVER'S LN"],
+    "Pippens Way": ["Pippens Way", "Pippen's Way"],
+    "Long Pond Drive": ["Long Pond Drive", "Long Pond Road", "Long Pond Rd"],
+    "Shawkemo Hills Lane": ["Shawkemo Hills Lane", "Shawkemo Hills Road"],
+    "Brier Patch Road": ["Brier Patch Road", "Briar Patch Road", "Briar Patch Rd"],
+    "Camp Richard": ["Camp Richard - well 1"],
+    "Rugged Road": ["Rugged Road", "Rugged Road - Main House -"],
+}
+for want, spellings in D8_GROUPS.items():
+    for raw in spellings:
+        eq(f"6 {raw!r}", norm(raw), want)
+eq("6 town text still removed before a correction", norm("Quidnet Nantucket"), "Quidnet Road")
+# Different real streets (operator 2026-11-17): never merged
+for a, b in (("Miacomet Avenue", "Miacomet Road"),
+             ("West Miacomet Avenue", "West Miacomet Road"),
+             ("Somerset Road", "Somerset Lane"),
+             ("Pochick Avenue", "Pochick Street")):
+    eq(f"6 {a} unchanged", norm(a), a)
+    eq(f"6 {b} unchanged", norm(b), b)
+d8 = _config_constant("STREET_NAME_DISPLAY_CORRECTIONS")
+never = ("miacomet", "somerset", "pochick")
+check("6 no D-8 correction touches a never-merge street",
+      not any(n in (k + v).lower() for k, v in d8.items() for n in never))
+check("6 D-8 list kept out of the search list",
+      not set(k.lower() for k in d8) & set(k.lower() for k in _config_constant("STREET_NAME_CORRECTIONS")))
+# Polpis (A)/(D) left as they are (operator 2026-11-17)
+eq("6 Polpis Road (A) kept", norm("Polpis Road (A)"), "Polpis Road (A)")
+# Search: display-only, a village name is not rewritten
+for q in ("Madaket", "Quidnet", "Tom Nevers", "10 Long Pond Road", "Eel Point"):
+    eq(f"6 search leaves {q!r}", asc(q), q)
 
 # 5. Wiring
 api = (ROOT / "app/routers/api.py").read_text()

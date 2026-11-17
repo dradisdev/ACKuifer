@@ -12,23 +12,25 @@ Mechanical rules only, no guessing:
   - a trailing abbreviated suffix is spelled out from STREET_SUFFIXES
     ("Polpis Rd" / "Polpis RD" / "Polpis Rd." -> "Polpis Road"), also before a
     trailing parenthetical ("Polpis Rd (A)" -> "Polpis Road (A)");
-  - known corrections from STREET_NAME_CORRECTIONS ("5th Way" -> "Fifth Way").
+  - known corrections from STREET_NAME_CORRECTIONS ("5th Way" -> "Fifth Way"),
+    also applied to search;
+  - operator-decided D-8 corrections from STREET_NAME_DISPLAY_CORRECTIONS
+    ("Quidnet" -> "Quidnet Road", "Lover's Lane" -> "Lovers Lane"), display only.
 
-Not handled (needs judgement, see D-8): missing suffixes ("Quidnet"), apostrophes
-("Lover's Lane" vs "Lovers Lane"), different real suffixes ("Long Pond Drive" vs
-"Long Pond Road"), and other free text.
+Anything not listed is left as it is; new judgement cases go through the operator.
 """
 
 import re
 from typing import Optional
 
-from app.config import STREET_NAME_CORRECTIONS, STREET_SUFFIXES
+from app.config import STREET_NAME_CORRECTIONS, STREET_NAME_DISPLAY_CORRECTIONS, STREET_SUFFIXES
 
 _LEADING_FRACTION = re.compile(r"^\d+/\d+\s+")
 _PARCEL_TAG = re.compile(r"\s+m\s*/\s*p\b.*$", re.I)
 _TRAILING_TOWN = re.compile(r",?\s+nantucket\b.*$", re.I)
 _TRAILING_PAREN = re.compile(r"(\s+\([^)]*\))$")
-_CORRECTIONS = {k.lower(): v for k, v in STREET_NAME_CORRECTIONS.items()}
+_CORRECTIONS = {k.lower(): v for k, v in
+                {**STREET_NAME_CORRECTIONS, **STREET_NAME_DISPLAY_CORRECTIONS}.items()}
 
 
 def _fix_case(word: str) -> str:
