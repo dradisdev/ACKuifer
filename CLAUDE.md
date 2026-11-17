@@ -68,3 +68,5 @@ This file is public: no hosts, IPs, credentials, or house numbers.
   Verified on staging; awaiting promotion to main (with D-1, D-2, D-7, D-9 and N-11)
 - 2026-11-16 — D-3 (street names): each street shows one standard spelling on the map, in the results list, digests and SMS (abbreviations spelled out, known corrections such as Fifth Way and Millbrook Road), and stray house-number fractions or extra address text are never shown
   Verified on staging; D-3 itself waits for the Dec 2 promotion and catch-up
+- 2026-11-17 — D-8 (street names): the operator's decisions on the remaining street spellings are applied on the map, in the results list, digests and SMS (missing suffixes added, apostrophes dropped, Long Pond Drive, Shawkemo Hills Lane, Brier Patch Road, free text trimmed); Miacomet, West Miacomet and Somerset pairs stay separate, and place-name searches are unchanged
+  Verified on staging; goes out with the Dec 2 promotion; D-8 seeded-row check still open
