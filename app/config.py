@@ -153,6 +153,8 @@ STREET_SUFFIXES: dict = {
 # they are also applied to search queries.
 # NEVER merge different real streets here. Known pairs that must stay separate:
 #   Pochick Avenue (Surfside) and Pochick Street (Siasconset).
+#   Miacomet Avenue and Miacomet Road; West Miacomet Avenue and West Miacomet Road;
+#   Somerset Road and Somerset Lane (operator 2026-11-17: all six exist).
 STREET_NAME_CORRECTIONS: dict = {
     "2nd Way": "Second Way",
     "3rd Way": "Third Way",
@@ -160,6 +162,38 @@ STREET_NAME_CORRECTIONS: dict = {
     "5th Way": "Fifth Way",
     # Operator-confirmed on the map 2026-11-16: every "Millbrook" result is on Millbrook Road.
     "Millbrook": "Millbrook Road",
+}
+# D-8 known corrections, decided by the operator 2026-11-17 from the staging
+# street-name report (whole street name after the rules above, case-insensitive).
+# Display only, NOT applied to search: several keys are also village or place
+# names ("Madaket", "Quidnet", "Tom Nevers"), and a search for those must still
+# find the place. Same never-merge rule as above.
+STREET_NAME_DISPLAY_CORRECTIONS: dict = {
+    # Missing suffix
+    "Dukes": "Dukes Road",
+    "Madaket": "Madaket Road",
+    "Okorwaw": "Okorwaw Avenue",
+    "Quidnet": "Quidnet Road",
+    "Sesapana": "Sesapana Road",
+    "Tennessee": "Tennessee Avenue",
+    "Vestal": "Vestal Street",
+    "Chuck Hollow": "Chuck Hollow Road",
+    "Wood Hollow": "Wood Hollow Road",
+    "Hummock Pond": "Hummock Pond Road",
+    "Tom Nevers": "Tom Nevers Road",
+    "Eel Point": "Eel Point Road",  # operator checked the map: all on Eel Point Road
+    # Apostrophes
+    "Helen's Drive": "Helens Drive",
+    "Lover's Lane": "Lovers Lane",
+    "Pippen's Way": "Pippens Way",
+    # Wrong suffix (the other street does not exist)
+    "Long Pond Road": "Long Pond Drive",
+    "Shawkemo Hills Road": "Shawkemo Hills Lane",
+    # Typo (both spellings resolve to the same place)
+    "Briar Patch Road": "Brier Patch Road",
+    # Free text after the street
+    "Camp Richard - well 1": "Camp Richard",
+    "Rugged Road - Main House -": "Rugged Road",
 }
 
 # Fallback neighborhood for unresolved parcels
