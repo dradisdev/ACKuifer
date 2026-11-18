@@ -72,3 +72,5 @@ This file is public: no hosts, IPs, credentials, or house numbers.
   Verified on staging; goes out with the Dec 2 promotion; D-8 seeded-row check still open
 - 2026-11-18 — D-5: paused — MassDEP checked against the portal (all documents ingested, no parse errors, daily schedule kept on purpose); the scraper now reads every page of the list, waiting for the first scheduled staging run
   Resume: see "Resume here" under D-5 in FINISH_PLAN.md
+- 2026-11-18 — D-6: production has no parser-garbled PFAS6 totals left (no backfill needed); the three discrepancies found since June match their lab reports; the Partition A scripts check the current database identity and run dry in a read-only session
+  Verified on production (read-only) after a staging rehearsal; script changes go to staging with this merge
