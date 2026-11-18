@@ -96,9 +96,10 @@ from dotenv import load_dotenv  # noqa: E402
 load_dotenv(_PROJECT_ROOT / ".env")
 
 from sqlalchemy import func, or_, text  # noqa: E402
+from sqlalchemy.orm import load_only  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
 
-from app.config import classify_result_status  # noqa: E402
+from app.config import classify_result_status, DB_ENV_FINGERPRINTS  # noqa: E402
 from app.database import SessionLocal  # noqa: E402
 from app.models.results import PfasResult  # noqa: E402
 from app.scrapers.laserfiche import _parse_report  # noqa: E402
@@ -148,7 +149,15 @@ def _find_pattern_a_candidates(db, doc_id_filter: int = None):
         func.coalesce(PfasResult.pfhpa, 0),
         func.coalesce(PfasResult.pfda, 0),
     )
-    q = db.query(PfasResult).filter(
+    # Load only the fields this script reads or writes, so it also runs
+    # against a DB a migration behind the code (D-6: production lacked
+    # migration 004's older_report column until the Dec 2 promotion).
+    q = db.query(PfasResult).options(load_only(
+        PfasResult.id, PfasResult.laserfiche_doc_id, PfasResult.street_name,
+        PfasResult.sample_date, PfasResult.pfas6_sum, PfasResult.result_status,
+        PfasResult.pass_fail, PfasResult.j_qualifier_present,
+        *(getattr(PfasResult, c) for c in REGULATED_COLUMNS),
+    )).filter(
         func.coalesce(PfasResult.pfas6_sum, 0) < largest_component,
         PfasResult.j_qualifier_present == False,  # noqa: E712
         PfasResult.hidden == False,  # noqa: E712
@@ -252,7 +261,7 @@ def main():
         help="REQUIRED. The environment you intend to run against. The script "
              "confirms the connected DB matches (by server addr + row count) and "
              "ABORTS on mismatch, so it can never run against the wrong DB. "
-             "staging=zephyr/10.195.138.142, prod=caboose/10.169.100.153.",
+             "Fingerprints: DB_ENV_FINGERPRINTS in app/config.py.",
     )
     args = parser.parse_args()
 
@@ -289,11 +298,13 @@ def main():
     # it matches the environment the operator explicitly named via --expect-env.
     # This is the last line of defense against running a prod-writing backfill
     # against the wrong database.
-    _ENV_FINGERPRINTS = {
-        "staging": {"addr": "10.195.138.142"},
-        "prod": {"addr": "10.169.100.153"},
-    }
     try:
+        if not will_commit:
+            # Dry-run: make the session read-only, so Postgres itself rejects
+            # any write (D-6). Applies to every transaction after this commit.
+            db.execute(text("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY"))
+            db.commit()
+        read_only = db.execute(text("SHOW transaction_read_only")).scalar()
         server_addr = str(db.execute(text("SELECT inet_server_addr()")).scalar())
         current_db = db.execute(text("SELECT current_database()")).scalar()
         row_count = db.execute(text("SELECT count(*) FROM pfas_results")).scalar()
@@ -306,13 +317,17 @@ def main():
     print(f"  server addr: {server_addr}")
     print(f"  database   : {current_db}")
     print(f"  pfas_results: {row_count}")
+    print(f"  read-only  : {read_only}")
     print("===================")
     logger.info(
         "DB identity: expect=%s addr=%s db=%s rows=%s",
         args.expect_env, server_addr, current_db, row_count,
     )
 
-    expected_addr = _ENV_FINGERPRINTS[args.expect_env]["addr"]
+    expected_addr = DB_ENV_FINGERPRINTS[args.expect_env]
+    if not will_commit and read_only != "on":
+        db.close()
+        sys.exit("ABORT: dry-run session is not read-only. Refusing to run.")
     if server_addr != expected_addr:
         db.close()
         sys.exit(
