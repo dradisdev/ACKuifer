@@ -65,6 +65,13 @@ class Settings(BaseSettings):
     # schedule from cronSchedule in railway.massdep.toml; keep the two equal.
     # Unlike Laserfiche there is no start guard: a deploy start also runs it.
     massdep_cron_schedule: str = "0 9 * * *"
+    # D-5: the EEA document list is paged (50 per page; 40 items on
+    # 2026-11-18). The scraper clicks "Next" until it is disabled. A run that
+    # can't finish paging is recorded "degraded" so the dead man's switch alerts.
+    massdep_max_pages: int = 20
+    # Longest wait for the list to change after clicking "Next".
+    massdep_page_change_timeout_ms: int = 10000
+    massdep_page_poll_ms: int = 250
 
     # Laserfiche portal constants
     laserfiche_base_url: str = "https://portal.laserfiche.com"
