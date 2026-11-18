@@ -96,6 +96,7 @@ from dotenv import load_dotenv  # noqa: E402
 load_dotenv(_PROJECT_ROOT / ".env")
 
 from sqlalchemy import func, or_, text  # noqa: E402
+from sqlalchemy.orm import load_only  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 from app.config import classify_result_status, DB_ENV_FINGERPRINTS  # noqa: E402
@@ -148,7 +149,15 @@ def _find_pattern_a_candidates(db, doc_id_filter: int = None):
         func.coalesce(PfasResult.pfhpa, 0),
         func.coalesce(PfasResult.pfda, 0),
     )
-    q = db.query(PfasResult).filter(
+    # Load only the fields this script reads or writes, so it also runs
+    # against a DB a migration behind the code (D-6: production lacked
+    # migration 004's older_report column until the Dec 2 promotion).
+    q = db.query(PfasResult).options(load_only(
+        PfasResult.id, PfasResult.laserfiche_doc_id, PfasResult.street_name,
+        PfasResult.sample_date, PfasResult.pfas6_sum, PfasResult.result_status,
+        PfasResult.pass_fail, PfasResult.j_qualifier_present,
+        *(getattr(PfasResult, c) for c in REGULATED_COLUMNS),
+    )).filter(
         func.coalesce(PfasResult.pfas6_sum, 0) < largest_component,
         PfasResult.j_qualifier_present == False,  # noqa: E712
         PfasResult.hidden == False,  # noqa: E712
