@@ -70,3 +70,5 @@ This file is public: no hosts, IPs, credentials, or house numbers.
   Verified on staging; D-3 itself waits for the Dec 2 promotion and catch-up
 - 2026-11-17 — D-8 (street names): the operator's decisions on the remaining street spellings are applied on the map, in the results list, digests and SMS (missing suffixes added, apostrophes dropped, Long Pond Drive, Shawkemo Hills Lane, Brier Patch Road, free text trimmed); Miacomet, West Miacomet and Somerset pairs stay separate, and place-name searches are unchanged
   Verified on staging; goes out with the Dec 2 promotion; D-8 seeded-row check still open
+- 2026-11-18 — D-5: paused — MassDEP checked against the portal (all documents ingested, no parse errors, daily schedule kept on purpose); the scraper now reads every page of the list, waiting for the first scheduled staging run
+  Resume: see "Resume here" under D-5 in FINISH_PLAN.md
