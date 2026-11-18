@@ -14,11 +14,13 @@ out of ~298 surviving pfas_results — this script is the canonical way to
 re-derive that list.
 
 USAGE
-    python -m scripts.find_inconsistent_pfas6
-    python -m scripts.find_inconsistent_pfas6 --limit 20
-    python -m scripts.find_inconsistent_pfas6 --csv > /tmp/inconsistent.csv
+    python3 scripts/find_inconsistent_pfas6.py --expect-env staging
+    python3 scripts/find_inconsistent_pfas6.py --expect-env prod --limit 20
+    python3 scripts/find_inconsistent_pfas6.py --expect-env staging --csv > /tmp/inconsistent.csv
 
-The script is read-only. It does not modify the database.
+The script is read-only: the session is opened read-only, so Postgres rejects
+any write. --expect-env is required and the run aborts unless the connected DB
+matches DB_ENV_FINGERPRINTS in app/config.py (D-6).
 """
 
 import argparse
@@ -38,6 +40,9 @@ except ImportError:
     sys.exit("ERROR: psycopg2 not installed. pip install psycopg2-binary")
 
 load_dotenv()
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from app.config import DB_ENV_FINGERPRINTS  # noqa: E402
 
 # Records where pfas6_sum < max(individual compound) are mathematically
 # inconsistent. We also project calculated_sum (the sum of all 6 regulated
@@ -108,6 +113,12 @@ def main():
         default=None,
         help="Limit output to N most-discrepant rows.",
     )
+    parser.add_argument(
+        "--expect-env",
+        choices=sorted(DB_ENV_FINGERPRINTS),
+        required=True,
+        help="REQUIRED. Environment you intend to read; aborts if the DB differs.",
+    )
     args = parser.parse_args()
 
     db_url = os.environ.get("DATABASE_URL")
@@ -115,10 +126,26 @@ def main():
         sys.exit("ERROR: DATABASE_URL not set. Check your .env file.")
 
     try:
-        with psycopg2.connect(db_url) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(QUERY)
-                rows = cur.fetchall()
+        conn = psycopg2.connect(db_url)
+        conn.set_session(readonly=True)
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT host(inet_server_addr()) AS addr, current_database() AS db, "
+                "(SELECT count(*) FROM pfas_results) AS n, "
+                "current_setting('transaction_read_only') AS ro"
+            )
+            ident = cur.fetchone()
+            out = sys.stderr if args.csv else sys.stdout
+            print(f"=== DB IDENTITY === expect-env={args.expect_env} addr={ident['addr']} "
+                  f"db={ident['db']} pfas_results={ident['n']} read-only={ident['ro']}", file=out)
+            expected = DB_ENV_FINGERPRINTS[args.expect_env]
+            if ident["addr"] != expected or ident["ro"] != "on":
+                conn.close()
+                sys.exit(f"ABORT: connected DB {ident['addr']} (read-only={ident['ro']}) is not "
+                         f"--expect-env {args.expect_env} ({expected}, read-only). Refusing to run.")
+            cur.execute(QUERY)
+            rows = cur.fetchall()
+        conn.close()
     except psycopg2.Error as e:
         sys.exit(f"ERROR: Database query failed: {e}")
 

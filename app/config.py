@@ -108,6 +108,16 @@ class Settings(BaseSettings):
     catchup_run: bool = False
 
 
+# --- DB identity guard (--expect-env) ---
+# Internal server address of each environment's Postgres, as reported by
+# inet_server_addr(). Guarded scripts refuse to run unless the connected DB
+# matches the environment named with --expect-env. Railway changed both
+# addresses in Nov 2026 (S-3); update here if they change again.
+DB_ENV_FINGERPRINTS: dict = {
+    "staging": "10.239.90.16",
+    "prod": "10.226.63.254",
+}
+
 # --- Named constants (regulatory / business logic) ---
 
 # Scrape run statuses whose parsed results are valid to notify subscribers about.
