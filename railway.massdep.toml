@@ -5,3 +5,6 @@ buildCommand = ""
 [deploy]
 startCommand = "python -m app.scrapers.run_massdep"
 restartPolicyType = "on_failure"
+# Daily at 09:00 UTC, by design (D-5). Must equal massdep_cron_schedule in
+# app/config.py. This line overrides the schedule set in the Railway dashboard.
+cronSchedule = "0 9 * * *"
