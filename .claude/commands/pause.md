@@ -31,13 +31,13 @@ Under the item (after its **Done when**), add or replace a dated block. Remove a
 - Never push `staging` or `main` from here without asking first, because both auto-deploy.
 - Update the "Where it stands" block to say the branch is pushed.
 
-## 4. Session log in `CLAUDE.md`
-- Append exactly two lines to `## Session Log` (newest at the bottom):
+## 4. Session log in `SESSION_LOG.md`
+- Append exactly two lines to `SESSION_LOG.md` (newest at the bottom):
   ```
   - YYYY-MM-DD — <item ID>: paused — <state in one line, e.g. "fix committed; live check blocked">
     Resume: see "Resume here" under <item ID> in FINISH_PLAN.md
   ```
-- `CLAUDE.md` is public. Keep out hosts, IPs, credentials, URLs of private environments, doc-level PFAS results tied to a parcel, and house numbers.
+- `SESSION_LOG.md` is public. Keep out hosts, IPs, credentials, URLs of private environments, doc-level PFAS results tied to a parcel, and house numbers.
 - Commit it to the **current feature branch** (`docs: session log, <item ID> paused`) and push the branch. It reaches `staging` when the branch merges. If you're on `staging` or `main`, commit but ask before pushing.
 
 ## 5. Tell the operator how to resume, in exactly two lines

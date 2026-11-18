@@ -6,7 +6,7 @@ argument-hint: "[optional item ID, e.g. D-2]"
 Work the next item from the launch plan. Stop at each **gate** and wait for the operator's reply. Never skip a gate.
 
 ## 1. Read
-- Read `FINISH_PLAN.md` (private and gitignored, never `git add` it) and the `## Session Log` section of `CLAUDE.md`.
+- Read `FINISH_PLAN.md` (private and gitignored, never `git add` it) and `SESSION_LOG.md`.
 - Run `git status` and `git branch --show-current`. If the tree isn't clean, stop and say what's uncommitted. (Being on a paused item's feature branch is fine.)
 
 ## 2. Pick one item
@@ -42,11 +42,11 @@ Work the next item from the launch plan. Stop at each **gate** and wait for the 
 
 ## 6. Close out (only after the operator confirms)
 - In `FINISH_PLAN.md`, add ` ✅ DONE YYYY-MM-DD` to the item's heading. Delete the item's "Resume here" checklist, if any (keep its evidence lines). Put a short evidence line under its **Done when** with what was checked, on staging, and the commit hash. If only the staging part is done and a production step remains, say so in the evidence line instead of marking it done.
-- In `CLAUDE.md`, append to `## Session Log` (newest at the bottom), exactly two lines:
+- In `SESSION_LOG.md`, append (newest at the bottom) exactly two lines:
   ```
   - YYYY-MM-DD — <item ID>: <what changed, one line>
     Verified on staging; <next step, e.g. "awaiting promotion to main">
   ```
-  `CLAUDE.md` is public. Keep the entry free of hosts, IPs, credentials, doc-level PFAS results tied to a parcel, and house numbers.
-- Commit the `CLAUDE.md` change to `staging` (`docs: session log for <item ID>`). Ask before pushing it. Never commit `FINISH_PLAN.md`.
+  `SESSION_LOG.md` is public. Keep the entry free of hosts, IPs, credentials, doc-level PFAS results tied to a parcel, and house numbers.
+- Commit the `SESSION_LOG.md` change to `staging` (`docs: session log for <item ID>`). Ask before pushing it. Never commit `FINISH_PLAN.md`.
 - Don't promote to `main`. Say that promotion is the operator's call.
