@@ -60,7 +60,18 @@ class Settings(BaseSettings):
     # N-11: LASERFICHE_FORCE_RUN=1 runs a full crawl on start, whatever the time
     # (e.g. a staging crawl). Remove it afterwards, or every deploy will crawl.
     laserfiche_force_run: bool = False
-    massdep_cron_schedule: str = "0 9 1,15 * *"
+    # D-5 (operator 2026-11-18): MassDEP runs DAILY by design. A run takes
+    # ~10s, and daily picks up new DEP filings sooner. Railway reads the
+    # schedule from cronSchedule in railway.massdep.toml; keep the two equal.
+    # Unlike Laserfiche there is no start guard: a deploy start also runs it.
+    massdep_cron_schedule: str = "0 9 * * *"
+    # D-5: the EEA document list is paged (50 per page; 40 items on
+    # 2026-11-18). The scraper clicks "Next" until it is disabled. A run that
+    # can't finish paging is recorded "degraded" so the dead man's switch alerts.
+    massdep_max_pages: int = 20
+    # Longest wait for the list to change after clicking "Next".
+    massdep_page_change_timeout_ms: int = 10000
+    massdep_page_poll_ms: int = 250
 
     # Laserfiche portal constants
     laserfiche_base_url: str = "https://portal.laserfiche.com"

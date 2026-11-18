@@ -26,7 +26,7 @@ from typing import Optional
 import pdfplumber
 from playwright.sync_api import sync_playwright, Page, Browser
 
-from app.config import classify_result_status, FALLBACK_NEIGHBORHOOD
+from app.config import classify_result_status, settings, FALLBACK_NEIGHBORHOOD, NOTIFIABLE_RUN_STATUSES
 from app.database import SessionLocal
 from app.geo.neighborhood import lookup_neighborhood
 from app.models.results import SourceDiscoveryResult
@@ -40,6 +40,8 @@ logger = logging.getLogger(__name__)
 
 RTN = "4-0029612"
 PORTAL_URL = f"https://eeaonline.eea.state.ma.us/portal/dep/wastesite/viewer/{RTN}"
+# Enabled "Next" link of the portal's (ngx-bootstrap) paginator (D-5).
+NEXT_PAGE_SELECTOR = "li.pagination-next:not(.disabled) a"
 
 # Regulated PFAS6 compounds — Massachusetts 310 CMR 22.07G
 REGULATED = ["PFOS", "PFOA", "PFNA", "PFHxS", "PFHpA", "PFDA"]
@@ -244,9 +246,7 @@ def _normalise_medium(s: str) -> str:
 # =============================================================================
 
 def _fetch_document_list(page: Page) -> list[dict]:
-    """Scrape the EEA portal document list. Returns list of doc dicts."""
-    documents = []
-
+    """Load the EEA portal and return the first page of its document list."""
     logger.info("Loading EEA portal: %s", PORTAL_URL)
     try:
         page.goto(PORTAL_URL, wait_until="networkidle", timeout=30000)
@@ -264,6 +264,13 @@ def _fetch_document_list(page: Page) -> list[dict]:
         logger.warning("Document list selector timed out, scraping anyway")
 
     page.wait_for_timeout(3000)
+
+    return _extract_documents(page)
+
+
+def _extract_documents(page: Page) -> list[dict]:
+    """Documents in the list as currently shown (one page of it)."""
+    documents = []
 
     # Strategy 1: PDF links directly
     pdf_links = page.eval_on_selector_all(
@@ -338,6 +345,54 @@ def _fetch_document_list(page: Page) -> list[dict]:
             unique.append(d)
 
     return unique
+
+
+def _collect_all_pages(page: Page) -> tuple[list[dict], Optional[str]]:
+    """Read every page of the (already loaded) document list (D-5).
+
+    Clicks the paginator's enabled "Next" until there is none. Returns
+    (documents, paging_problem); paging_problem is None when every page was
+    read, otherwise why the list may be incomplete (the run is then degraded).
+    """
+    documents = _extract_documents(page)
+    urls = {d["url"] for d in documents}
+    pages_read = 1
+
+    while True:
+        nxt = page.locator(NEXT_PAGE_SELECTOR)
+        if nxt.count() == 0:
+            return documents, None
+        if pages_read >= settings.massdep_max_pages:
+            return documents, (
+                f"Document list still had a next page after {pages_read} pages "
+                f"(limit massdep_max_pages); {len(documents)} documents read"
+            )
+        before = {d["url"] for d in _extract_documents(page)}
+        try:
+            nxt.first.click(timeout=settings.massdep_page_change_timeout_ms)
+        except Exception as e:
+            return documents, f"Could not open page {pages_read + 1} of the document list: {type(e).__name__}"
+
+        waited = 0
+        current = before
+        while waited < settings.massdep_page_change_timeout_ms:
+            page.wait_for_timeout(settings.massdep_page_poll_ms)
+            waited += settings.massdep_page_poll_ms
+            current_docs = _extract_documents(page)
+            current = {d["url"] for d in current_docs}
+            if current and current != before:
+                break
+        if not current or current == before:
+            return documents, (
+                f"Page {pages_read + 1} of the document list did not load after clicking Next; "
+                f"{len(documents)} documents read"
+            )
+        pages_read += 1
+        for d in current_docs:
+            if d["url"] not in urls:
+                urls.add(d["url"])
+                documents.append(d)
+        logger.info("Document list page %d: %d documents so far", pages_read, len(documents))
 
 
 def _download_pdf(url: str, dest: Path, browser: Browser) -> bool:
@@ -1494,9 +1549,13 @@ def run_massdep_scraper(
             page = browser.new_page()
             page.set_default_timeout(30000)
 
-            # Fetch document list from EEA portal
-            documents = _fetch_document_list(page)
+            # Fetch document list from EEA portal (every page, D-5)
+            _fetch_document_list(page)
+            documents, paging_problem = _collect_all_pages(page)
             logger.info("Found %d documents on EEA portal", len(documents))
+            if paging_problem:
+                final_status, error_message = "degraded", paging_problem[:2000]
+                logger.error("Run degraded: %s", paging_problem)
 
             if not documents:
                 logger.warning(
@@ -1526,8 +1585,9 @@ def run_massdep_scraper(
             run.parse_errors = stats["parse_errors"]
             db.commit()
 
-    # Send notifications if the run succeeded and found new results
-    if final_status == "success" and stats["new_docs_parsed"] > 0:
+    # Send notifications if the run finished (a degraded run still read some
+    # pages) and found new results
+    if final_status in NOTIFIABLE_RUN_STATUSES and stats["new_docs_parsed"] > 0:
         try:
             from app.notifications.engine import run_notifications
             with SessionLocal() as db:
