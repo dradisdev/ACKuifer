@@ -35,3 +35,5 @@ This file is public: no hosts, IPs, credentials, or house numbers.
   Verified on production (read-only) after a staging rehearsal; script changes go to staging with this merge
 - 2026-11-19 — D-5: MassDEP runs once a day on schedule (not on every deploy) and reads every page of the portal list; its first scheduled staging run found all 51 documents with no errors
   Verified on staging; goes out with the Dec 2 promotion
+- 2026-11-19 — D-8: the 16 prototype-seeded results match a fresh parse of their reports on staging and production (PFAS6, compounds, status, street, sample date), so no backfill is needed; the check reads the portal once and the database read-only
+  Verified on staging and production (read-only); street-name display fixes go out with the Dec 2 promotion
