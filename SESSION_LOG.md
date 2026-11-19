@@ -37,3 +37,5 @@ This file is public: no hosts, IPs, credentials, or house numbers.
   Verified on staging; goes out with the Dec 2 promotion
 - 2026-11-19 — D-8: the 16 prototype-seeded results match a fresh parse of their reports on staging and production (PFAS6, compounds, status, street, sample date), so no backfill is needed; the check reads the portal once and the database read-only
   Verified on staging and production (read-only); street-name display fixes go out with the Dec 2 promotion
+- 2026-11-19 — S-5: Railway variables inventoried for every service in both environments; links in digest emails now verify on the site, staging links point at staging, staging services follow database password changes, and unused variables (including SMS) are removed
+  Verified on production and staging; production laserfiche-cron cleanup waits for the Dec 4 promotion step
