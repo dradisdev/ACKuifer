@@ -33,3 +33,5 @@ This file is public: no hosts, IPs, credentials, or house numbers.
   Resume: see "Resume here" under D-5 in FINISH_PLAN.md
 - 2026-11-18 — D-6: production has no parser-garbled PFAS6 totals left (no backfill needed); the three discrepancies found since June match their lab reports; the Partition A scripts check the current database identity and run dry in a read-only session
   Verified on production (read-only) after a staging rehearsal; script changes go to staging with this merge
+- 2026-11-19 — D-5: MassDEP runs once a day on schedule (not on every deploy) and reads every page of the portal list; its first scheduled staging run found all 51 documents with no errors
+  Verified on staging; goes out with the Dec 2 promotion
