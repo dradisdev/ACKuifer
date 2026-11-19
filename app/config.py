@@ -118,6 +118,10 @@ DB_ENV_FINGERPRINTS: dict = {
     "prod": "10.226.63.254",
 }
 
+# D-8: two PFAS values (ppt) count as equal in the seeded-row re-parse check when
+# they differ by no more than this (stored Numeric vs parsed float rounding).
+REPARSE_MATCH_TOLERANCE_PPT: float = 0.005
+
 # --- Named constants (regulatory / business logic) ---
 
 # Scrape run statuses whose parsed results are valid to notify subscribers about.
