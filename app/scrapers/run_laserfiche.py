@@ -26,6 +26,7 @@ import logging
 import sys
 
 from app.config import settings
+from app.secret_guard import enforce_secrets
 from app.scrapers.laserfiche import run_laserfiche_scraper
 from app.scrapers.start_guard import start_reason
 
@@ -38,6 +39,9 @@ logger = logging.getLogger("run_laserfiche")
 
 
 def main():
+    # S-1: digests carry signed links, so a real SECRET_KEY is required (before
+    # the start guard, so every deploy start logs the check).
+    enforce_secrets("laserfiche-cron")
     parser = argparse.ArgumentParser(description="Run the Laserfiche PFAS scraper")
     parser.add_argument(
         "--map",

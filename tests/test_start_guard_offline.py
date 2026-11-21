@@ -48,6 +48,7 @@ settings.laserfiche_schedule_window_minutes = 60
 _mod("app")
 _mod("app.config", settings=settings)
 _mod("app.scrapers")
+_mod("app.secret_guard", enforce_secrets=lambda service: [])  # S-1 guard: tested in test_secret_guard_offline.py
 CALLS = []
 _mod("app.scrapers.laserfiche",
      run_laserfiche_scraper=lambda **kw: (CALLS.append(kw), {

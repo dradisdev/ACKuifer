@@ -98,6 +98,7 @@ _mod("app.geo.parcel_lookup",
 _mod("app.routers")
 _mod("app.notifications")
 _mod("app.scrapers")
+_mod("app.secret_guard", enforce_secrets=lambda service: [])  # S-1 guard: tested in test_secret_guard_offline.py
 CALLS = []
 _mod("app.scrapers.laserfiche",
      run_laserfiche_scraper=lambda **kw: (CALLS.append(kw), {
