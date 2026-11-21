@@ -18,9 +18,10 @@ class Settings(BaseSettings):
     # Database
     database_url: str
 
-    # Security
-    admin_password: str = "changeme"
-    secret_key: str = "changeme"
+    # Security. No usable default (S-1): on Railway, a service that needs one of
+    # these refuses to start when it's unset or a placeholder (app/secret_guard.py).
+    admin_password: str = ""
+    secret_key: str = ""
 
     # Email (Resend)
     resend_api_key: str = ""
@@ -116,6 +117,28 @@ class Settings(BaseSettings):
 DB_ENV_FINGERPRINTS: dict = {
     "staging": "10.239.90.16",
     "prod": "10.226.63.254",
+}
+
+# --- S-1: fail closed on missing secrets ---
+# Values that count as unset for ADMIN_PASSWORD / SECRET_KEY (compared after
+# stripping whitespace, case-insensitive): empty, the old default, and the
+# .env.example placeholders.
+PLACEHOLDER_SECRET_VALUES: tuple = (
+    "",
+    "changeme",
+    "your_admin_password_here",
+    "your_secret_key_here",
+)
+# Railway sets this on every service; when present the guard enforces (refuses
+# to start), otherwise (local development) it only warns.
+SECRET_GUARD_ENFORCE_ENV_VAR: str = "RAILWAY_ENVIRONMENT_NAME"
+# Settings each service must have. web checks admin logins and link tokens; the
+# scraper crons sign digest manage/unsubscribe links; healthcheck-cron reads neither.
+SECRET_GUARD_REQUIRED: dict = {
+    "web": ("admin_password", "secret_key"),
+    "laserfiche-cron": ("secret_key",),
+    "massdep-cron": ("secret_key",),
+    "healthcheck-cron": (),
 }
 
 # D-8: two PFAS values (ppt) count as equal in the seeded-row re-parse check when

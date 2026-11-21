@@ -15,6 +15,7 @@ import argparse
 import logging
 import sys
 
+from app.secret_guard import enforce_secrets
 from app.scrapers.massdep import run_massdep_scraper
 
 logging.basicConfig(
@@ -26,6 +27,8 @@ logger = logging.getLogger("run_massdep")
 
 
 def main():
+    # S-1: digests carry signed links, so a real SECRET_KEY is required.
+    enforce_secrets("massdep-cron")
     parser = argparse.ArgumentParser(description="Run the MassDEP Source Discovery scraper")
     parser.add_argument(
         "--no-headless",

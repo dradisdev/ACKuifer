@@ -5,7 +5,12 @@ from datetime import datetime, timezone
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.routers import admin, api, map, signup
+from app.secret_guard import enforce_secrets
+
+# S-1: on Railway, refuse to start without a real ADMIN_PASSWORD and SECRET_KEY.
+enforce_secrets("web")
+
+from app.routers import admin, api, map, signup  # noqa: E402
 
 app = FastAPI(title="ACKuifer", version="1.0.0")
 

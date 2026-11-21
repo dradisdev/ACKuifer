@@ -34,6 +34,7 @@ from sqlalchemy import text
 
 from app.config import settings
 from app.database import SessionLocal
+from app.secret_guard import enforce_secrets
 from app.monitoring.health import (
     SOURCES,
     check_and_alert,
@@ -64,6 +65,8 @@ def _log_identity(db) -> None:
 
 
 def main():
+    # S-1: healthcheck-cron needs no secret; this only logs the guard's status line.
+    enforce_secrets("healthcheck-cron")
     parser = argparse.ArgumentParser(description="Run the dead man's switch health monitor")
     parser.add_argument(
         "--dry-run",
