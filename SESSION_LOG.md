@@ -39,3 +39,5 @@ This file is public: no hosts, IPs, credentials, or house numbers.
   Verified on staging and production (read-only); street-name display fixes go out with the Dec 2 promotion
 - 2026-11-19 — S-5: Railway variables inventoried for every service in both environments; links in digest emails now verify on the site, staging links point at staging, staging services follow database password changes, and unused variables (including SMS) are removed
   Verified on production and staging; production laserfiche-cron cleanup waits for the Dec 4 promotion step
+- 2026-11-22 — S-1: on Railway, the site refuses to start without a real admin password and signing key, and the scraper crons without a real signing key (no more "changeme" default); every service logs one line saying whether the check is enforcing
+  Verified on staging (including a deliberate placeholder deploy that was refused); goes out with the Dec 4 promotion
