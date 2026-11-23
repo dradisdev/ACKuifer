@@ -13,9 +13,12 @@ regulated compounds, then re-classifies via classify_result_status from
 app.config — same logic the (now-fixed) parser uses going forward.
 
 USAGE
-    python -m scripts.backfill_pattern_b           # dry-run preview (default)
-    python -m scripts.backfill_pattern_b --csv     # CSV preview for audit
-    python -m scripts.backfill_pattern_b --apply   # actually commit changes
+    python -m scripts.backfill_pattern_b --expect-env staging          # read-only preview (default)
+    python -m scripts.backfill_pattern_b --expect-env staging --csv    # CSV preview for audit
+    python -m scripts.backfill_pattern_b --expect-env staging --apply  # actually commit changes
+
+--expect-env is required: the run aborts unless the connected DB is that
+environment (S-3, app/db_identity.py). Previews run in a read-only session.
 
 CRITERIA for Pattern B candidate:
     j_qualifier_present = True
@@ -54,10 +57,12 @@ from dotenv import load_dotenv  # noqa: E402
 
 load_dotenv(_PROJECT_ROOT / ".env")
 
-from sqlalchemy import or_  # noqa: E402
+from sqlalchemy import or_, text  # noqa: E402
+from sqlalchemy.orm import load_only  # noqa: E402
 
-from app.config import classify_result_status  # noqa: E402
+from app.config import DB_ENV_FINGERPRINTS, classify_result_status  # noqa: E402
 from app.database import SessionLocal  # noqa: E402
+from app.db_identity import verify_db_identity  # noqa: E402
 from app.models.results import PfasResult  # noqa: E402
 
 
@@ -78,6 +83,13 @@ def _find_pattern_b_candidates(db):
     """Query Pattern B candidates per the filter in the module docstring."""
     return (
         db.query(PfasResult)
+        # Only the columns used here, so it also runs on a DB without later
+        # migrations (production lacks older_report until migration 004).
+        .options(load_only(
+            PfasResult.laserfiche_doc_id, PfasResult.street_name, PfasResult.sample_date,
+            PfasResult.pfas6_sum, PfasResult.result_status, PfasResult.pfos, PfasResult.pfoa,
+            PfasResult.pfhxs, PfasResult.pfna, PfasResult.pfhpa, PfasResult.pfda,
+        ))
         .filter(
             PfasResult.j_qualifier_present == True,  # noqa: E712
             PfasResult.pfas6_sum == Decimal("0"),
@@ -195,12 +207,28 @@ def main():
         action="store_true",
         help="Output the change preview as CSV (for audit/review).",
     )
+    parser.add_argument(
+        "--expect-env",
+        choices=sorted(DB_ENV_FINGERPRINTS),
+        required=True,
+        help="REQUIRED. Environment you intend to touch; aborts if the DB differs.",
+    )
     args = parser.parse_args()
 
     if args.apply and args.csv:
         sys.exit("ERROR: --apply and --csv are mutually exclusive.")
 
     db = SessionLocal()
+    try:
+        if not args.apply:
+            db.execute(text("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY"))
+            db.commit()
+        verify_db_identity(db, args.expect_env, read_only=not args.apply,
+                           out=sys.stderr if args.csv else sys.stdout)
+    except Exception as e:
+        db.close()
+        sys.exit(f"ERROR confirming DB identity: {e}")
+
     try:
         candidates = _find_pattern_b_candidates(db)
     except Exception as e:
