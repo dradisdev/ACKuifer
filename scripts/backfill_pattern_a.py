@@ -100,6 +100,7 @@ from sqlalchemy.orm import load_only  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 from app.config import classify_result_status, DB_ENV_FINGERPRINTS  # noqa: E402
+from app.db_identity import verify_db_identity  # noqa: E402
 from app.database import SessionLocal  # noqa: E402
 from app.models.results import PfasResult  # noqa: E402
 from app.scrapers.laserfiche import _parse_report  # noqa: E402
@@ -304,40 +305,11 @@ def main():
             # any write (D-6). Applies to every transaction after this commit.
             db.execute(text("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY"))
             db.commit()
-        read_only = db.execute(text("SHOW transaction_read_only")).scalar()
-        server_addr = str(db.execute(text("SELECT inet_server_addr()")).scalar())
-        current_db = db.execute(text("SELECT current_database()")).scalar()
-        row_count = db.execute(text("SELECT count(*) FROM pfas_results")).scalar()
+        verify_db_identity(db, args.expect_env, read_only=not will_commit)
     except Exception as e:
         db.close()
         sys.exit(f"ERROR confirming DB identity: {e}")
-
-    print("=== DB IDENTITY ===")
-    print(f"  expect-env : {args.expect_env}")
-    print(f"  server addr: {server_addr}")
-    print(f"  database   : {current_db}")
-    print(f"  pfas_results: {row_count}")
-    print(f"  read-only  : {read_only}")
-    print("===================")
-    logger.info(
-        "DB identity: expect=%s addr=%s db=%s rows=%s",
-        args.expect_env, server_addr, current_db, row_count,
-    )
-
-    expected_addr = DB_ENV_FINGERPRINTS[args.expect_env]
-    if not will_commit and read_only != "on":
-        db.close()
-        sys.exit("ABORT: dry-run session is not read-only. Refusing to run.")
-    if server_addr != expected_addr:
-        db.close()
-        sys.exit(
-            f"ABORT: connected server {server_addr} does NOT match "
-            f"--expect-env {args.expect_env} (expected {expected_addr}).\n"
-            f"       The DB connection is not the environment you named. "
-            f"Refusing to run.\n"
-            f"       Check your DATABASE_URL / .env and try again."
-        )
-    print(f"  identity OK -- confirmed {args.expect_env}. Proceeding.\n")
+    print()
 
     try:
         all_candidates = _find_pattern_a_candidates(db, doc_id_filter=args.doc_id)

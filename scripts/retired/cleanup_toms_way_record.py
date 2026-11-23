@@ -17,6 +17,8 @@ Usage:
 DATABASE_URL is loaded from .env automatically.
 """
 
+raise SystemExit("RETIRED (S-3, 2026-11-23): finished one-off; see scripts/retired/README.txt. Not run.")
+
 import argparse
 import os
 import sys

@@ -20,6 +20,8 @@ Usage:
     python scripts/restore_toms_way_hidden.py --confirm
 """
 
+raise SystemExit("RETIRED (S-3, 2026-11-23): finished one-off; see scripts/retired/README.txt. Not run.")
+
 import argparse
 import os
 import sys

@@ -110,13 +110,22 @@ class Settings(BaseSettings):
 
 
 # --- DB identity guard (--expect-env) ---
-# Internal server address of each environment's Postgres, as reported by
-# inet_server_addr(). Guarded scripts refuse to run unless the connected DB
-# matches the environment named with --expect-env. Railway changed both
-# addresses in Nov 2026 (S-3); update here if they change again.
+# Server address of each environment's Postgres as seen through Railway's public
+# proxy (from the laptop), reported by inet_server_addr(). Guarded scripts
+# (app/db_identity.py) refuse to run unless the connected DB matches the
+# environment named with --expect-env. Railway changed both addresses in Nov
+# 2026 (S-3); update here if they change again. Inside Railway the private
+# network shows an IPv6 address instead, so guarded scripts refuse there.
 DB_ENV_FINGERPRINTS: dict = {
     "staging": "10.239.90.16",
     "prod": "10.226.63.254",
+}
+DB_IDENTITY_NAME: str = "railway"
+# Sanity range for pfas_results, not the identity check: it only catches an empty
+# or freshly restored database. Kept wide so catch-up growth never trips it.
+DB_ENV_ROW_RANGES: dict = {
+    "staging": (300, 10000),
+    "prod": (300, 10000),
 }
 
 # --- S-1: fail closed on missing secrets ---

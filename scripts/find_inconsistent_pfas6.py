@@ -43,6 +43,7 @@ load_dotenv()
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.config import DB_ENV_FINGERPRINTS  # noqa: E402
+from app.db_identity import verify_db_identity  # noqa: E402
 
 # Records where pfas6_sum < max(individual compound) are mathematically
 # inconsistent. We also project calculated_sum (the sum of all 6 regulated
@@ -129,20 +130,8 @@ def main():
         conn = psycopg2.connect(db_url)
         conn.set_session(readonly=True)
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(
-                "SELECT host(inet_server_addr()) AS addr, current_database() AS db, "
-                "(SELECT count(*) FROM pfas_results) AS n, "
-                "current_setting('transaction_read_only') AS ro"
-            )
-            ident = cur.fetchone()
-            out = sys.stderr if args.csv else sys.stdout
-            print(f"=== DB IDENTITY === expect-env={args.expect_env} addr={ident['addr']} "
-                  f"db={ident['db']} pfas_results={ident['n']} read-only={ident['ro']}", file=out)
-            expected = DB_ENV_FINGERPRINTS[args.expect_env]
-            if ident["addr"] != expected or ident["ro"] != "on":
-                conn.close()
-                sys.exit(f"ABORT: connected DB {ident['addr']} (read-only={ident['ro']}) is not "
-                         f"--expect-env {args.expect_env} ({expected}, read-only). Refusing to run.")
+            verify_db_identity(cur, args.expect_env, read_only=True,
+                               out=sys.stderr if args.csv else sys.stdout)
             cur.execute(QUERY)
             rows = cur.fetchall()
         conn.close()

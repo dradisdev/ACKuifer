@@ -14,6 +14,8 @@ Without --confirm: dry-run only. Prints counts and a sample of rows.
 With --confirm: performs the deletes inside a single transaction.
 """
 
+raise SystemExit("RETIRED (S-3, 2026-11-23): finished one-off; see scripts/retired/README.txt. Not run.")
+
 import argparse
 import os
 import sys
