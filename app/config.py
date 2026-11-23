@@ -117,7 +117,7 @@ class Settings(BaseSettings):
 # 2026 (S-3); update here if they change again. Inside Railway the private
 # network shows an IPv6 address instead, so guarded scripts refuse there.
 DB_ENV_FINGERPRINTS: dict = {
-    "staging": "10.239.90.16",
+    "staging": "10.138.104.194",
     "prod": "10.226.63.254",
 }
 DB_IDENTITY_NAME: str = "railway"
