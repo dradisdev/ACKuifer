@@ -45,3 +45,5 @@ This file is public: no hosts, IPs, credentials, or house numbers.
   Verified on staging and production (read-only and dry runs); goes out with the Dec 4 promotion
 - 2026-11-24 — S-4: staging database password rotated after earlier exposure; the old password is refused and every staging service runs on the new one
   Verified on staging (site, both scraper crons, and a scheduled MassDEP run); no production change
+- 2026-11-24 — S-3b: database scripts now recognise each environment by its public connection host instead of a server address that changes on every database restart; the address is still shown for the record
+  Verified on staging and production (read-only and dry runs); goes out with the Dec 4 promotion
