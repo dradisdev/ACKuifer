@@ -47,3 +47,5 @@ This file is public: no hosts, IPs, credentials, or house numbers.
   Verified on staging (site, both scraper crons, and a scheduled MassDEP run); no production change
 - 2026-11-24 — S-3b: database scripts now recognise each environment by its public connection host instead of a server address that changes on every database restart; the address is still shown for the record
   Verified on staging and production (read-only and dry runs); goes out with the Dec 4 promotion
+- 2026-11-24 — S-6: email sending keys are now send-only, limited to the site's domain and separate for staging and production; map tokens only work from their own sites; production email links now use the address that serves the site (they had been landing on the homepage)
+  Verified on staging and production; production laserfiche-cron switches keys at the Dec 4 promotion, then the old email key is deleted
