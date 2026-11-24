@@ -49,3 +49,5 @@ This file is public: no hosts, IPs, credentials, or house numbers.
   Verified on staging and production (read-only and dry runs); goes out with the Dec 4 promotion
 - 2026-11-24 — S-6: email sending keys are now send-only, limited to the site's domain and separate for staging and production; map tokens only work from their own sites; production email links now use the address that serves the site (they had been landing on the homepage)
   Verified on staging and production; production laserfiche-cron switches keys at the Dec 4 promotion, then the old email key is deleted
+- 2026-11-24 — F-3: paused — privacy page plan and draft text proposed; waiting on text approval and three decisions (retention wording, contact address, feedback/analytics lines)
+  Resume: see "Resume here" under F-3 in FINISH_PLAN.md
