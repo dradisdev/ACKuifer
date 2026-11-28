@@ -9,7 +9,7 @@ from typing import Optional
 import resend
 from sqlalchemy.orm import Session
 
-from app.config import MCL, RETEST_WINDOW_DAYS, SMS_THRESHOLD, settings
+from app.config import MCL, PRIVACY_PATH, RETEST_WINDOW_DAYS, SMS_THRESHOLD, settings
 from app.models.results import PfasResult, SourceDiscoveryResult
 from app.models.users import Subscription, User
 
@@ -18,6 +18,18 @@ logger = logging.getLogger(__name__)
 # Reuse the street-name cleaning logic from api.py for Source Discovery display
 from app.geo.street_names import normalize_street_name
 from app.routers.api import _clean_sd_street_name, older_report_label, strip_unit_designator
+
+
+def _footer_note_html() -> str:
+    """Closing footer line shared by the digest, confirmation and reconfirmation emails.
+
+    F-3: carries the Privacy link, built from BASE_URL like every other emailed link.
+    """
+    return f"""<p style="font-size:12px;color:#A0AEC0;margin:8px 0 0 0;">
+        ACKuifer is an independent public-interest service. Your email is never shared.
+        <a href="{settings.base_url}" style="color:#A0AEC0;">ackuifer.org</a> &middot;
+        <a href="{settings.base_url}{PRIVACY_PATH}" style="color:#A0AEC0;">Privacy</a>
+      </p>"""
 
 
 def _format_date(d) -> str:
@@ -313,10 +325,7 @@ def _build_digest_html(neighborhood: str, rows: list, unsubscribe_url: str, mana
         <a href="{manage_url}" style="color:#2B6CB0;text-decoration:none;">Manage subscriptions</a> &middot;
         <a href="{unsubscribe_url}" style="color:#2B6CB0;text-decoration:none;">Unsubscribe</a>
       </p>
-      <p style="font-size:12px;color:#A0AEC0;margin:8px 0 0 0;">
-        ACKuifer is an independent public-interest service. Your email is never shared.
-        <a href="{settings.base_url}" style="color:#A0AEC0;">ackuifer.org</a>
-      </p>
+      {_footer_note_html()}
     </div>
   </div>
 
@@ -357,10 +366,7 @@ def _build_reconfirmation_html(user_email: str, reconfirm_url: str, unsubscribe_
       <p style="font-size:13px;color:#718096;margin:0;">
         <a href="{unsubscribe_url}" style="color:#2B6CB0;text-decoration:none;">Unsubscribe instead</a>
       </p>
-      <p style="font-size:12px;color:#A0AEC0;margin:8px 0 0 0;">
-        ACKuifer is an independent public-interest service. Your email is never shared.
-        <a href="{settings.base_url}" style="color:#A0AEC0;">ackuifer.org</a>
-      </p>
+      {_footer_note_html()}
     </div>
   </div>
 
@@ -579,10 +585,7 @@ def send_confirmation_email(user: User, db: Session) -> bool:
       <p style="font-size:13px;color:#718096;margin:0;">
         Didn't sign up? <a href="{unsubscribe_url}" style="color:#2B6CB0;text-decoration:none;">Unsubscribe</a>
       </p>
-      <p style="font-size:12px;color:#A0AEC0;margin:8px 0 0 0;">
-        ACKuifer is an independent public-interest service. Your email is never shared.
-        <a href="{settings.base_url}" style="color:#A0AEC0;">ackuifer.org</a>
-      </p>
+      {_footer_note_html()}
     </div>
   </div>
 

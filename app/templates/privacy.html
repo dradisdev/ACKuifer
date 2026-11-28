@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ACKuifer — Privacy</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #1a1a1a; background: #f8f9fa; line-height: 1.6;
+    }
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.6rem 1rem; background: #1a3a5c; color: #fff;
+    }
+    .topbar h1 { font-size: 1.1rem; font-weight: 700; }
+    .topbar h1 a { color: #fff; text-decoration: none; }
+    .topbar-actions a {
+      color: #fff; text-decoration: none; font-size: 0.85rem;
+      padding: 0.35rem 0.7rem; border: 1px solid rgba(255,255,255,0.4); border-radius: 4px;
+    }
+    .container { max-width: 640px; margin: 0 auto; padding: 2rem 1.5rem; }
+    h2 { font-size: 1.5rem; color: #1a3a5c; margin-bottom: 0.5rem; }
+    .intro { color: #4a5568; font-size: 0.95rem; margin-bottom: 2rem; }
+    .section { margin-bottom: 1.8rem; }
+    .section h3 {
+      font-size: 1.1rem; color: #1a3a5c; margin-bottom: 0.6rem;
+      padding-bottom: 0.4rem; border-bottom: 2px solid #e2e8f0;
+    }
+    .section p, .section li { font-size: 0.95rem; color: #2d3748; }
+    .section p + p { margin-top: 0.6rem; }
+    .section ul { padding-left: 1.2rem; }
+    .section li { margin-bottom: 0.3rem; }
+    a { color: #2b6cb0; }
+    .updated { color: #718096; font-size: 0.85rem; }
+    footer {
+      text-align: center; margin-top: 2.5rem; padding-top: 1rem;
+      border-top: 1px solid #e2e8f0; color: #718096; font-size: 0.8rem;
+    }
+    footer a { color: #4a5568; }
+    @media (max-width: 480px) { .container { padding: 1.5rem 1rem; } }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1><a href="/">ACKuifer</a></h1>
+    <div class="topbar-actions">
+      <a href="/map">Map</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <h2>Privacy</h2>
+    <p class="intro">
+      ACKuifer collects as little as it can. This page says what that is and what happens to it.
+    </p>
+
+    <div class="section">
+      <h3>What we collect</h3>
+      <ul>
+        <li>Your email address.</li>
+        <li>The neighborhoods you chose for alerts.</li>
+        <li>When you signed up, confirmed, and last used your subscription.</li>
+        <li>If you send feedback: your message, the page you sent it from, and your email address if you choose to give it.</li>
+      </ul>
+      <p>We don't ask for your name, house number or phone number.</p>
+    </div>
+
+    <div class="section">
+      <h3>What we use it for</h3>
+      <p>
+        Only to send the alerts you asked for and messages about your subscription,
+        and to read feedback you send. We never sell or share your information, and there are no ads.
+      </p>
+    </div>
+
+    <div class="section">
+      <h3>Who handles it</h3>
+      <ul>
+        <li><strong>Railway</strong> hosts the site and its database.</li>
+        <li><strong>Resend</strong> delivers our emails.</li>
+        <li><strong>Mapbox</strong> provides the map images.</li>
+        <li><strong>Plausible</strong> counts visits to the site without cookies and without collecting personal data.</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h3>Cookies</h3>
+      <p>The public site sets no cookies.</p>
+    </div>
+
+    <div class="section">
+      <h3>Unsubscribing</h3>
+      <p>
+        Every email has an unsubscribe link, and you can change your neighborhoods
+        with the "Manage subscriptions" link.
+      </p>
+      <p>
+        When you unsubscribe, we keep your address marked as unsubscribed so we never email
+        you again by mistake. To have it deleted completely, write to
+        <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.
+      </p>
+    </div>
+
+    <div class="section">
+      <h3>Questions</h3>
+      <p>Write to <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.</p>
+    </div>
+
+    <p class="updated">Last updated {{ last_updated }}.</p>
+
+    <footer>
+      ACKuifer is independently operated and is not affiliated with the Town of Nantucket.
+      <a href="/pfas-info">Learn about PFAS</a>
+    </footer>
+  </div>
+</body>
+</html>

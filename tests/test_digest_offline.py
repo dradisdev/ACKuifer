@@ -46,7 +46,7 @@ settings.email_from = "alerts@example.com"
 settings.base_url = "https://example.test"
 
 _mod("app")
-_mod("app.config", MCL=70, RETEST_WINDOW_DAYS=365, SMS_THRESHOLD=1000.0,
+_mod("app.config", PRIVACY_PATH="/privacy", MCL=70, RETEST_WINDOW_DAYS=365, SMS_THRESHOLD=1000.0,
      NOTIFIABLE_RUN_STATUSES=("success",), settings=settings)
 
 class PfasResult:

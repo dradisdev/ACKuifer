@@ -9,7 +9,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from app.config import settings
+from app.config import PRIVACY_PATH, settings
 from app.geo.neighborhood import lookup_neighborhood
 from app.geo.street_names import apply_search_corrections
 from app.routers.admin import _is_authenticated
@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["pages"])
 templates = Jinja2Templates(directory="app/templates")
+templates.env.globals["privacy_path"] = PRIVACY_PATH
 
 # Nantucket bounding box for Nominatim viewbox bias
 _NANTUCKET_VIEWBOX = "-70.30,41.22,-69.93,41.34"

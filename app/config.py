@@ -176,6 +176,13 @@ INACTIVITY_MONTHS: int = 12
 # Days to retain record after unsubscribe before deletion
 RETENTION_DAYS_AFTER_UNSUBSCRIBE: int = 30
 
+# F-3: privacy page. Linked from every public page footer and every email footer.
+PRIVACY_PATH: str = "/privacy"
+# Public contact address (Squarespace forwards it to the operator).
+CONTACT_EMAIL: str = "hello@ackuifer.org"
+# Shown on the privacy page; change it whenever the page text changes.
+PRIVACY_LAST_UPDATED: str = "November 28, 2026"
+
 # Days within which same-street results are treated as retests in digest
 RETEST_WINDOW_DAYS: int = 60
 
