@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app.config import settings
+from app.config import CONTACT_EMAIL, PRIVACY_LAST_UPDATED, PRIVACY_PATH, settings
 from app.database import get_db
 from app.geo.neighborhood import get_all_neighborhoods
 from app.models.users import Subscription, User
@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["signup"])
 templates = Jinja2Templates(directory="app/templates")
+templates.env.globals["privacy_path"] = PRIVACY_PATH
 
 _EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 
@@ -61,6 +62,16 @@ def pfas_info(request: Request, db: Session = Depends(get_db)):
         "request": request,
         "tested_links": tested_links,
         "results_links": results_links,
+    })
+
+
+# --- GET /privacy (F-3) ---
+@router.get(PRIVACY_PATH, response_class=HTMLResponse)
+def privacy(request: Request):
+    return templates.TemplateResponse("privacy.html", {
+        "request": request,
+        "contact_email": CONTACT_EMAIL,
+        "last_updated": PRIVACY_LAST_UPDATED,
     })
 
 

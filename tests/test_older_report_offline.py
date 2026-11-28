@@ -81,7 +81,7 @@ def _no_db():
     raise RuntimeError("no database in offline tests")
 
 _mod("app")
-_mod("app.config", MCL=20.0, SMS_THRESHOLD=16.0, RETEST_WINDOW_DAYS=60,
+_mod("app.config", PRIVACY_PATH="/privacy", MCL=20.0, SMS_THRESHOLD=16.0, RETEST_WINDOW_DAYS=60,
      OLDER_REPORT_LABEL=LABEL, OLDER_REPORT_SHORT=SHORT,
      OLDER_REPORT_MIN_AGE_DAYS=MIN_AGE, STREET_SUFFIXES=_config_constant("STREET_SUFFIXES"),
      STREET_NAME_CORRECTIONS=_config_constant("STREET_NAME_CORRECTIONS"),
